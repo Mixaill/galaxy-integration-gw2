@@ -1,0 +1,11 @@
+{
+    "name": "Galaxy Guild Wars 2 plugin",
+    "platform": "gw2",
+    "guid": "637b1fd4-b1d0-4de8-9bf6-757e639807f3",
+    "version": "0.1.0",
+    "description": "Galaxy Guild Wars 2 plugin",
+    "author": "Mikhail Paulyshka",
+    "email": "me@mixaill.tk",
+    "url": "https://github.com/Mixaill/galaxy-integration-gw2",
+    "script": "plugin.py"
+}
