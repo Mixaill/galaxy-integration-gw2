@@ -6,10 +6,13 @@ import xml.etree.ElementTree as ElementTree
 
 class GWLocalGame(object):
     def __init__(self, game_dir, game_executable):
-        self._dir = game_dir
-        self._executable = game_executable
+        self._dir = game_dir.lower()
+        self._executable = game_executable.lower()
 
-    def run_game(self):
+    def exe_name(self) -> str:
+        return self._executable
+
+    def run_game(self) -> None:
         subprocess.Popen([os.path.join(self._dir,self._executable)], creationflags=0x00000008, cwd = self._dir)
 
 

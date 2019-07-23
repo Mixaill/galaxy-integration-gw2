@@ -7,6 +7,9 @@ GOG Galaxy 2.0 Guild Wars 2 integration
 
 ## Changelog
 
+* v. 0.2.0
+   * detect game launch
+
 * v. 0.1.0
    * initial release
 

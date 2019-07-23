@@ -11,6 +11,8 @@ if thirdparty not in sys.path:
 
 from version import __version__
 
+import psutil
+
 #Start sentry
 import sentry_sdk
 sentry_sdk.init(
@@ -26,10 +28,16 @@ from gw2_api import GW2API
 import gw2_localgame
 
 class GuildWars2Plugin(Plugin):
+
+    SLEEP_CHECK_RUNNING = 5
+    SLEEP_CHECK_RUNNING_ITER = 0.01
+
     def __init__(self, reader, writer, token):
         super().__init__(Platform.GuildWars2, __version__, reader, writer, token)
         self._gw2_api = GW2API()
         self._game_instances = None
+        self._task_check_for_running  = None
+        self._last_state = LocalGameState.None_
 
     async def authenticate(self, stored_credentials=None):
         if not stored_credentials:
@@ -70,9 +78,11 @@ class GuildWars2Plugin(Plugin):
     async def get_local_games(self):
         self._game_instances = gw2_localgame.get_game_instances()
         if len(self._game_instances) == 0:
+            self._last_state = LocalGameState.None_
             return []
 
-        return [ LocalGame(game_id='guild_wars_2', local_game_state = LocalGameState.Installed)]
+        self._last_state = LocalGameState.Installed
+        return [ LocalGame(game_id='guild_wars_2', local_game_state = self._last_state)]
 
     async def get_owned_games(self):
         free_to_play = False
@@ -125,7 +135,49 @@ class GuildWars2Plugin(Plugin):
 
 
     def tick(self):
-        pass
+        if not self._task_check_for_running or self._task_check_for_running.done():
+            self._task_check_for_running = asyncio.create_task(self.task_check_for_running_func())
+
+
+    async def task_check_for_running_func(self):
+
+        if self._last_state == LocalGameState.None_:
+            await asyncio.sleep(self.SLEEP_CHECK_RUNNING)
+            return
+
+        if not self._game_instances:
+            await asyncio.sleep(self.SLEEP_CHECK_RUNNING)
+            return
+
+        #get exe names
+        target_exes = list()
+        for instance in self._game_instances:
+            target_exes.append(instance.exe_name().lower())
+
+        #check processes
+        running = False     
+        for process in psutil.process_iter():
+            try:
+                if process.name().lower() in target_exes:
+                    running = True
+                    break
+            except (psutil.AccessDenied, psutil.NoSuchProcess):
+                continue
+
+            await asyncio.sleep(self.SLEEP_CHECK_RUNNING_ITER)
+
+        #update state
+        new_state = None
+        if running:
+            new_state = LocalGameState.Installed | LocalGameState.Running
+        else:
+            new_state = LocalGameState.Installed
+
+        if self._last_state != new_state:
+            self.update_local_game_status(LocalGame('guild_wars_2', new_state))
+            self._last_state = new_state
+
+        await asyncio.sleep(self.SLEEP_CHECK_RUNNING)
 
 
 def main():
