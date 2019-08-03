@@ -17,7 +17,11 @@ import requests
 
 class GW2AuthorizationResult(Enum):
     FAILED = 0
-    FINISHED = 1
+    FAILED_INVALID_TOKEN = 1
+    FAILED_INVALID_KEY = 2
+    FAILED_NO_ACCOUNT = 3
+    FAILED_BAD_DATA = 4
+    FINISHED = 5
 
 class GW2AuthorizationServer(BaseHTTPRequestHandler):
     backend = None
@@ -58,6 +62,8 @@ class GW2AuthorizationServer(BaseHTTPRequestHandler):
         self.send_header('Content-type', "text/html")
         if auth_result == GW2AuthorizationResult.FINISHED:
             self.send_header('Location','/finished')
+        elif auth_result == GW2AuthorizationResult.FAILED_NO_ACCOUNT:
+            self.send_header('Location', '/login_noaccount')
         else:
             self.send_header('Location','/login_failed')
 
@@ -163,21 +169,42 @@ class GW2API(object):
             return False
 
     def do_auth_apikey(self, api_key : str) -> GW2AuthorizationResult:
+        (status_code, account_info) = self.__api_get_account_info(api_key)
+
+        if account_info is None:
+            return GW2AuthorizationResult.FAILED
+
+        if status_code != 200:
+            if 'text' not in account_info:
+                return GW2AuthorizationResult.FAILED
+
+            if account_info['text'] == 'Invalid access token':
+                return GW2AuthorizationResult.FAILED_INVALID_TOKEN
+
+            if account_info['text'] == 'invalid key':
+                return GW2AuthorizationResult.FAILED_INVALID_KEY
+
+            if account_info['text'] == 'no game account':
+                return GW2AuthorizationResult.FAILED_NO_ACCOUNT
+
+            if account_info['text'] == 'ErrBadData':
+                return GW2AuthorizationResult.FAILED_BAD_DATA
+
+            logging.error('do_auth_apikey: %s, %s' % (status_code, account_info))
+            return GW2AuthorizationResult.FAILED
+
         self._api_key = api_key
-        self._account_info = self.__api_get_account_info()
-
-        if self._account_info is not None:
-            return GW2AuthorizationResult.FINISHED
-
-        self._api_key = None
-        return GW2AuthorizationResult.FAILED
+        self._account_info = account_info
+        return GW2AuthorizationResult.FINISHED
 
 
-    def __api_get_account_info(self):
-        resp = requests.get(self.API_DOMAIN+self.API_URL_ACCOUNT, params={'access_token': self._api_key})
+    def __api_get_account_info(self, api_key):
+        resp = requests.get(self.API_DOMAIN+self.API_URL_ACCOUNT, params={'access_token': api_key})
 
-        if resp.status_code != 200:
+        result = None
+        try: 
+            result = json.loads(resp.text)
+        except Exception:
             logging.error('gw2api/__api_get_account_info: %s' % resp.text)
-            return None
 
-        return json.loads(resp.text)
+        return (resp.status_code, json.loads(resp.text))
