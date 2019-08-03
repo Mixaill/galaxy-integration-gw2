@@ -111,16 +111,13 @@ class GuildWars2Plugin(Plugin):
         return [ Game(game_id = 'guild_wars_2', game_title = 'Guild Wars 2', dlcs = dlcs, license_info = LicenseInfo(license_type = license_type)) ]
 
 
-    async def get_game_times(self):
-        pass
+    async def get_game_time(self, game_id, context):
+        time_played = None
+        last_played_time = None
+        if game_id == 'guild_wars_2':
+            time_played = int(self._gw2_api.get_account_age() / 60)
 
-
-    async def import_game_times(self, game_ids: List[str]) -> None:
-        for game_id in game_ids:
-            if game_id != 'guild_wars_2':
-                continue
-
-            self.game_time_import_success(GameTime(game_id = game_id, time_played = int(self._gw2_api.get_account_age() / 60), last_played_time = None))
+        return GameTime(game_id = game_id, time_played = time_played, last_played_time = last_played_time)
 
 
     async def launch_game(self, game_id):
