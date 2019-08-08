@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import sys
+import time
 from typing import List
 
 #expand sys.path
@@ -116,6 +117,7 @@ class GuildWars2Plugin(Plugin):
         last_played_time = None
         if game_id == 'guild_wars_2':
             time_played = int(self._gw2_api.get_account_age() / 60)
+            last_played_time = self.persistent_cache.get('last_played')
 
         return GameTime(game_id = game_id, time_played = time_played, last_played_time = last_played_time)
 
@@ -166,6 +168,7 @@ class GuildWars2Plugin(Plugin):
         #update state
         new_state = None
         if running:
+            self.persistent_cache['last_played'] = int(time.time())
             new_state = LocalGameState.Installed | LocalGameState.Running
         else:
             new_state = LocalGameState.Installed
