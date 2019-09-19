@@ -81,6 +81,16 @@ class Platform(Enum):
     NintendoDs = "nds"
     Nintendo3Ds = "3ds"
     PathOfExile = "pathofexile"
+    Twitch = "twitch"
+    Minecraft = "minecraft"
+    GameSessions = "gamesessions"
+    Nuuvem = "nuuvem"
+    FXStore = "fxstore"
+    IndieGala = "indiegala"
+    Playfire = "playfire"
+    Oculus = "oculus"
+    Test = "test"
+
 
 class Feature(Enum):
     """Possible features that can be implemented by an integration.
@@ -99,6 +109,7 @@ class Feature(Enum):
     VerifyGame = "VerifyGame"
     ImportFriends = "ImportFriends"
     ShutdownPlatformClient = "ShutdownPlatformClient"
+    LaunchPlatformClient = "LaunchPlatformClient"
 
 
 class LicenseType(Enum):
