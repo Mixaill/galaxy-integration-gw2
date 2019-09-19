@@ -118,6 +118,10 @@ class GW2API(object):
         return self._api_key
 
     def get_account_id(self) -> str:
+        if self._account_info is None:
+            logging.error('GW2API/get_account_id: account info is None')
+            return None
+
         return self._account_info['id']
 
     def get_account_name(self) -> str:
