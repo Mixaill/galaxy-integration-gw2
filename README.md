@@ -7,6 +7,11 @@ GOG Galaxy 2.0 Guild Wars 2 integration
 
 ## Changelog
 
+* v. 0.2.2
+   * Galaxy SDK was updated to 0.50
+   * Improved handling of GW2 API server errors
+   * Implemented periodically check for changes in installed game instances
+
 * v. 0.2.1
    * Galaxy SDK was updated to 0.46
    * improvements in authorization error handling
