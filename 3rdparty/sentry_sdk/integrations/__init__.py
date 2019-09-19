@@ -6,7 +6,8 @@ from threading import Lock
 from sentry_sdk._compat import iteritems
 from sentry_sdk.utils import logger
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Iterator
     from typing import Dict
@@ -81,7 +82,7 @@ def setup_integrations(integrations, with_defaults=True):
                     type(integration).setup_once()
                 except NotImplementedError:
                     if getattr(integration, "install", None) is not None:
-                        logger.warn(
+                        logger.warning(
                             "Integration %s: The install method is "
                             "deprecated. Use `setup_once`.",
                             identifier,

@@ -2,6 +2,7 @@ import os
 import uuid
 import random
 from datetime import datetime
+import socket
 
 from sentry_sdk._compat import string_types, text_type, iteritems
 from sentry_sdk.utils import (
@@ -17,7 +18,8 @@ from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Callable
@@ -25,10 +27,11 @@ if MYPY:
     from typing import Optional
 
     from sentry_sdk.scope import Scope
-    from sentry_sdk.utils import Event, Hint
+    from sentry_sdk._types import Event, Hint
 
 
 _client_init_debug = ContextVar("client_init_debug")
+_client_in_capture_event = ContextVar("client_in_capture_event")
 
 
 def _get_options(*args, **kwargs):
@@ -58,6 +61,9 @@ def _get_options(*args, **kwargs):
     if rv["environment"] is None:
         rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT")
 
+    if rv["server_name"] is None and hasattr(socket, "gethostname"):
+        rv["server_name"] = socket.gethostname()
+
     return rv  # type: ignore
 
 
@@ -69,15 +75,28 @@ class _Client(object):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (*Optional[str], **Any) -> None
+        # type: (*Any, **Any) -> None
+        self.options = get_options(*args, **kwargs)  # type: Dict[str, Any]
+        self._init_impl()
+
+    def __getstate__(self):
+        # type: () -> Any
+        return {"options": self.options}
+
+    def __setstate__(self, state):
+        # type: (Any) -> None
+        self.options = state["options"]
+        self._init_impl()
+
+    def _init_impl(self):
+        # type: () -> None
         old_debug = _client_init_debug.get(False)
         try:
-            self.options = options = get_options(*args, **kwargs)  # type: ignore
-            _client_init_debug.set(options["debug"])
-            self.transport = make_transport(options)
+            _client_init_debug.set(self.options["debug"])
+            self.transport = make_transport(self.options)
 
             request_bodies = ("always", "never", "small", "medium")
-            if options["request_bodies"] not in request_bodies:
+            if self.options["request_bodies"] not in request_bodies:
                 raise ValueError(
                     "Invalid value for request_bodies. Must be one of {}".format(
                         request_bodies
@@ -85,7 +104,8 @@ class _Client(object):
                 )
 
             self.integrations = setup_integrations(
-                options["integrations"], with_defaults=options["default_integrations"]
+                self.options["integrations"],
+                with_defaults=self.options["default_integrations"],
             )
         finally:
             _client_init_debug.set(old_debug)
@@ -206,53 +226,72 @@ class _Client(object):
 
         return True
 
-    def capture_event(self, event, hint=None, scope=None):
-        # type: (Dict[str, Any], Optional[Any], Optional[Scope]) -> Optional[str]
+    def capture_event(
+        self,
+        event,  # type: Event
+        hint=None,  # type: Optional[Hint]
+        scope=None,  # type: Optional[Scope]
+    ):
+        # type: (...) -> Optional[str]
         """Captures an event.
 
-        This takes the ready made event and an optional hint and scope.  The
-        hint is internally used to further customize the representation of the
-        error.  When provided it's a dictionary of optional information such
-        as exception info.
+        :param event: A ready-made event that can be directly sent to Sentry.
 
-        If the transport is not set nothing happens, otherwise the return
-        value of this function will be the ID of the captured event.
+        :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
+
+        :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
-        if self.transport is None:
+        is_recursive = _client_in_capture_event.get(False)
+        if is_recursive:
             return None
-        if hint is None:
-            hint = {}
-        rv = event.get("event_id")
-        if rv is None:
-            event["event_id"] = rv = uuid.uuid4().hex
-        if not self._should_capture(event, hint, scope):
-            return None
-        event = self._prepare_event(event, hint, scope)
-        if event is None:
-            return None
-        self.transport.capture_event(event)
-        return rv
 
-    def close(self, timeout=None, callback=None):
-        # type: (Optional[float], Optional[Callable[[int, float], None]]) -> None
+        _client_in_capture_event.set(True)
+
+        try:
+            if self.transport is None:
+                return None
+            if hint is None:
+                hint = {}
+            event_id = event.get("event_id")
+            if event_id is None:
+                event["event_id"] = event_id = uuid.uuid4().hex
+            if not self._should_capture(event, hint, scope):
+                return None
+            event_opt = self._prepare_event(event, hint, scope)
+            if event_opt is None:
+                return None
+            self.transport.capture_event(event_opt)
+            return event_id
+        finally:
+            _client_in_capture_event.set(False)
+
+    def close(
+        self,
+        timeout=None,  # type: Optional[float]
+        callback=None,  # type: Optional[Callable[[int, float], None]]
+    ):
+        # type: (...) -> None
         """
         Close the client and shut down the transport. Arguments have the same
-        semantics as `self.flush()`.
+        semantics as :py:meth:`Client.flush`.
         """
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.transport.kill()
             self.transport = None
 
-    def flush(self, timeout=None, callback=None):
-        # type: (Optional[float], Optional[Callable[[int, float], None]]) -> None
+    def flush(
+        self,
+        timeout=None,  # type: Optional[float]
+        callback=None,  # type: Optional[Callable[[int, float], None]]
+    ):
+        # type: (...) -> None
         """
-        Wait `timeout` seconds for the current events to be sent. If no
-        `timeout` is provided, the `shutdown_timeout` option value is used.
+        Wait for the current events to be sent.
 
-        The `callback` is invoked with two arguments: the number of pending
-        events and the configured timeout.  For instance the default atexit
-        integration will use this to render out a message on stderr.
+        :param timeout: Wait for at most `timeout` seconds. If no `timeout` is provided, the `shutdown_timeout` option value is used.
+
+        :param callback: Is invoked with the number of pending events and the configured timeout.
         """
         if self.transport is not None:
             if timeout is None:
@@ -268,7 +307,8 @@ class _Client(object):
         self.close()
 
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     # Make mypy, PyCharm and other static analyzers think `get_options` is a
     # type to have nicer autocompletion for params.

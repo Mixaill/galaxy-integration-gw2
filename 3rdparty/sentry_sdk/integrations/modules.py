@@ -4,14 +4,15 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Dict
     from typing import Tuple
     from typing import Iterator
 
-    from sentry_sdk.utils import Event
+    from sentry_sdk._types import Event
 
 
 _installed_modules = None
@@ -45,6 +46,11 @@ class ModulesIntegration(Integration):
         @add_global_event_processor
         def processor(event, hint):
             # type: (Event, Any) -> Dict[str, Any]
-            if Hub.current.get_integration(ModulesIntegration) is not None:
-                event["modules"] = dict(_get_installed_modules())
+            if event.get("type") == "transaction":
+                return event
+
+            if Hub.current.get_integration(ModulesIntegration) is None:
+                return event
+
+            event["modules"] = dict(_get_installed_modules())
             return event

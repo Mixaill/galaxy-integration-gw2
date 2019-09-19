@@ -11,7 +11,8 @@ from rq.timeouts import JobTimeoutException  # type: ignore
 from rq.worker import Worker  # type: ignore
 from rq.queue import Queue  # type: ignore
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Dict
@@ -49,11 +50,12 @@ class RqIntegration(Integration):
                 span = Span.continue_from_headers(
                     job.meta.get("_sentry_trace_headers") or {}
                 )
+                span.op = "rq.task"
 
                 with capture_internal_exceptions():
                     span.transaction = job.func_name
 
-                with hub.span(span):
+                with hub.start_span(span):
                     rv = old_perform_job(self, job, *args, **kwargs)
 
             if self.is_horse:

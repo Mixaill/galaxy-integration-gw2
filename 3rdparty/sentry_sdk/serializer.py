@@ -1,4 +1,5 @@
 import contextlib
+
 from datetime import datetime
 
 from sentry_sdk.utils import (
@@ -10,7 +11,8 @@ from sentry_sdk.utils import (
 
 from sentry_sdk._compat import text_type, PY2, string_types, number_types, iteritems
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Dict
@@ -20,7 +22,9 @@ if MYPY:
     from typing import Union
     from typing import Generator
 
-    ReprProcessor = Callable[[Any, Dict[str, Any]], Union[NotImplemented, str]]
+    # https://github.com/python/mypy/issues/5710
+    _NotImplemented = Any
+    ReprProcessor = Callable[[Any, Dict[str, Any]], Union[_NotImplemented, str]]
     Segment = Union[str, int]
 
 
@@ -282,7 +286,7 @@ class Serializer(object):
                 return obj
 
             if isinstance(obj, datetime):
-                return text_type(obj.strftime("%Y-%m-%dT%H:%M:%SZ"))
+                return text_type(obj.strftime("%Y-%m-%dT%H:%M:%S.%fZ"))
 
             if isinstance(obj, bytes):
                 obj = obj.decode("utf-8", "replace")

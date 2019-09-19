@@ -8,7 +8,9 @@ import weakref
 from django import VERSION as DJANGO_VERSION  # type: ignore
 from django.core import signals  # type: ignore
 
-MYPY = False
+from sentry_sdk._types import MYPY
+from sentry_sdk.utils import HAS_REAL_CONTEXTVARS
+
 if MYPY:
     from typing import Any
     from typing import Callable
@@ -22,7 +24,7 @@ if MYPY:
     from django.utils.datastructures import MultiValueDict  # type: ignore
 
     from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from sentry_sdk.utils import Event, Hint
+    from sentry_sdk._types import Event, Hint
 
 
 try:
@@ -45,9 +47,9 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
-from sentry_sdk.integrations._sql_common import format_sql
 from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
 from sentry_sdk.integrations.django.templates import get_template_frame_from_exception
+from sentry_sdk.integrations.django.middleware import patch_django_middlewares
 
 
 if DJANGO_VERSION < (1, 10):
@@ -68,9 +70,10 @@ class DjangoIntegration(Integration):
     identifier = "django"
 
     transaction_style = None
+    middleware_spans = None
 
-    def __init__(self, transaction_style="url"):
-        # type: (str) -> None
+    def __init__(self, transaction_style="url", middleware_spans=True):
+        # type: (str, bool) -> None
         TRANSACTION_STYLE_VALUES = ("function_name", "url")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -78,6 +81,7 @@ class DjangoIntegration(Integration):
                 % (transaction_style, TRANSACTION_STYLE_VALUES)
             )
         self.transaction_style = transaction_style
+        self.middleware_spans = middleware_spans
 
     @staticmethod
     def setup_once():
@@ -98,9 +102,9 @@ class DjangoIntegration(Integration):
             if Hub.current.get_integration(DjangoIntegration) is None:
                 return old_app(self, environ, start_response)
 
-            return SentryWsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))(
-                environ, start_response
-            )
+            bound_old_app = old_app.__get__(self, WSGIHandler)
+
+            return SentryWsgiMiddleware(bound_old_app)(environ, start_response)
 
         WSGIHandler.__call__ = sentry_patched_wsgi_handler
 
@@ -208,6 +212,9 @@ class DjangoIntegration(Integration):
                 id(value),
             )
 
+        _patch_channels()
+        patch_django_middlewares()
+
 
 _DRF_PATCHED = False
 _DRF_PATCH_LOCK = threading.Lock()
@@ -264,6 +271,38 @@ def _patch_drf():
                     return old_drf_initial(self, request, *args, **kwargs)
 
                 APIView.initial = sentry_patched_drf_initial
+
+
+def _patch_channels():
+    try:
+        from channels.http import AsgiHandler  # type: ignore
+    except ImportError:
+        return
+
+    if not HAS_REAL_CONTEXTVARS:
+        # We better have contextvars or we're going to leak state between
+        # requests.
+        raise RuntimeError(
+            "We detected that you are using Django channels 2.0. To get proper "
+            "instrumentation for ASGI requests, the Sentry SDK requires "
+            "Python 3.7+ or the aiocontextvars package from PyPI."
+        )
+
+    from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+
+    old_app = AsgiHandler.__call__
+
+    def sentry_patched_asgi_handler(self, receive, send):
+        if Hub.current.get_integration(DjangoIntegration) is None:
+            return old_app(receive, send)
+
+        middleware = SentryAsgiMiddleware(
+            lambda _scope: old_app.__get__(self, AsgiHandler)
+        )
+
+        return middleware(self.scope)(receive, send)
+
+    AsgiHandler.__call__ = sentry_patched_asgi_handler
 
 
 def _make_event_processor(weak_request, integration):
@@ -390,7 +429,7 @@ def install_sql_hook():
             return real_execute(self, sql, params)
 
         with record_sql_queries(
-            hub, [format_sql(sql, params, self.cursor)], label="Django: "
+            hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ):
             return real_execute(self, sql, params)
 
@@ -400,9 +439,7 @@ def install_sql_hook():
             return real_executemany(self, sql, param_list)
 
         with record_sql_queries(
-            hub,
-            [format_sql(sql, params, self.cursor) for params in param_list],
-            label="Django: ",
+            hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
         ):
             return real_executemany(self, sql, param_list)
 

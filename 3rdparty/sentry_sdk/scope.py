@@ -5,7 +5,8 @@ from itertools import chain
 
 from sentry_sdk.utils import logger, capture_internal_exceptions
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Dict
@@ -15,7 +16,13 @@ if MYPY:
     from typing import Callable
     from typing import TypeVar
 
-    from sentry_sdk.utils import Breadcrumb, Event, EventProcessor, ErrorProcessor, Hint
+    from sentry_sdk._types import (
+        Breadcrumb,
+        Event,
+        EventProcessor,
+        ErrorProcessor,
+        Hint,
+    )
 
     F = TypeVar("F", bound=Callable[..., Any])
 
@@ -188,6 +195,13 @@ class Scope(object):
 
         :param func: This function behaves like `before_send.`
         """
+        if len(self._event_processors) > 20:
+            logger.warning(
+                "Too many event processors on scope! Clearing list to free up some memory: %r",
+                self._event_processors,
+            )
+            del self._event_processors[:]
+
         self._event_processors.append(func)
 
     def add_error_processor(
@@ -234,7 +248,9 @@ class Scope(object):
         if self._level is not None:
             event["level"] = self._level
 
-        event.setdefault("breadcrumbs", []).extend(self._breadcrumbs)
+        if event.get("type") != "transaction":
+            event.setdefault("breadcrumbs", []).extend(self._breadcrumbs)
+
         if event.get("user") is None and self._user is not None:
             event["user"] = self._user
 

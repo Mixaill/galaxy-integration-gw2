@@ -6,9 +6,10 @@ import logging
 from contextlib import contextmanager
 from datetime import datetime
 
-from sentry_sdk._compat import urlparse, text_type, implements_str, int_types, PY2
+from sentry_sdk._compat import urlparse, text_type, implements_str, PY2
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Callable
@@ -18,26 +19,13 @@ if MYPY:
     from typing import Optional
     from typing import Set
     from typing import Tuple
-    from typing import Type
     from typing import Union
     from types import FrameType
     from types import TracebackType
 
-    from sentry_sdk.hub import Hub
+    import sentry_sdk
 
-    ExcInfo = Tuple[
-        Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]
-    ]
-
-    Event = Dict[str, Any]
-    Hint = Dict[str, Any]
-
-    Breadcrumb = Dict[str, Any]
-    BreadcrumbHint = Dict[str, Any]
-
-    EventProcessor = Callable[[Event, Hint], Optional[Event]]
-    ErrorProcessor = Callable[[Event, ExcInfo], Optional[Event]]
-    BreadcrumbProcessor = Callable[[Breadcrumb, BreadcrumbHint], Optional[Breadcrumb]]
+    from sentry_sdk._types import ExcInfo
 
 epoch = datetime(1970, 1, 1)
 
@@ -50,7 +38,7 @@ MAX_FORMAT_PARAM_LENGTH = 128
 
 
 def _get_debug_hub():
-    # type: () -> Optional[Hub]
+    # type: () -> Optional[sentry_sdk.Hub]
     # This function is replaced by debug.py
     pass
 
@@ -207,6 +195,13 @@ class AnnotatedValue(object):
         self.metadata = metadata
 
 
+if MYPY:
+    from typing import TypeVar
+
+    T = TypeVar("T")
+    Annotated = Union[AnnotatedValue, T]
+
+
 def get_type_name(cls):
     # type: (Optional[type]) -> Optional[str]
     return getattr(cls, "__qualname__", None) or getattr(cls, "__name__", None)
@@ -248,22 +243,13 @@ def iter_stacks(tb):
         tb_ = tb_.tb_next
 
 
-def slim_string(value, length=MAX_STRING_LENGTH):
-    # type: (str, int) -> str
-    if not value:
-        return value
-    if len(value) > length:
-        return value[: length - 3] + "..."
-    return value[:length]
-
-
 def get_lines_from_file(
     filename,  # type: str
     lineno,  # type: int
     loader=None,  # type: Optional[Any]
     module=None,  # type: Optional[str]
 ):
-    # type: (...) -> Tuple[List[str], Optional[str], List[str]]
+    # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
     context_lines = 5
     source = None
     if loader is not None and hasattr(loader, "get_source"):
@@ -288,11 +274,11 @@ def get_lines_from_file(
 
     try:
         pre_context = [
-            slim_string(line.strip("\r\n")) for line in source[lower_bound:lineno]
+            strip_string(line.strip("\r\n")) for line in source[lower_bound:lineno]
         ]
-        context_line = slim_string(source[lineno].strip("\r\n"))
+        context_line = strip_string(source[lineno].strip("\r\n"))
         post_context = [
-            slim_string(line.strip("\r\n"))
+            strip_string(line.strip("\r\n"))
             for line in source[(lineno + 1) : upper_bound]
         ]
         return pre_context, context_line, post_context
@@ -301,8 +287,11 @@ def get_lines_from_file(
         return [], None, []
 
 
-def get_source_context(frame, tb_lineno):
-    # type: (FrameType, int) -> Tuple[List[str], Optional[str], List[str]]
+def get_source_context(
+    frame,  # type: FrameType
+    tb_lineno,  # type: int
+):
+    # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
     try:
         abs_path = frame.f_code.co_filename  # type: Optional[str]
     except Exception:
@@ -664,12 +653,18 @@ def _module_in_set(name, set):
     return False
 
 
-def strip_string(value, max_length=512):
-    # type: (str, int) -> Union[AnnotatedValue, str]
+def strip_string(value, max_length=None):
+    # type: (str, Optional[int]) -> Union[AnnotatedValue, str]
     # TODO: read max_length from config
     if not value:
         return value
+
+    if max_length is None:
+        # This is intentionally not just the default such that one can patch `MAX_STRING_LENGTH` and affect `strip_string`.
+        max_length = MAX_STRING_LENGTH
+
     length = len(value)
+
     if length > max_length:
         return AnnotatedValue(
             value=value[: max_length - 3] + u"...",
@@ -681,97 +676,12 @@ def strip_string(value, max_length=512):
     return value
 
 
-def format_and_strip(
-    template, params, strip_string=strip_string, max_length=MAX_FORMAT_PARAM_LENGTH
-):
-    """Format a string containing %s for placeholders and call `strip_string`
-    on each parameter. The string template itself does not have a maximum
-    length.
-
-    TODO: handle other placeholders, not just %s
-    """
-    chunks = template.split(u"%s")
-    if not chunks:
-        raise ValueError("No formatting placeholders found")
-
-    params = params[: len(chunks) - 1]
-
-    if len(params) < len(chunks) - 1:
-        raise ValueError("Not enough params.")
-
-    concat_chunks = []
-    iter_chunks = iter(chunks)  # type: Optional[Iterator]
-    iter_params = iter(params)  # type: Optional[Iterator]
-
-    while iter_chunks is not None or iter_params is not None:
-        if iter_chunks is not None:
-            try:
-                concat_chunks.append(next(iter_chunks))
-            except StopIteration:
-                iter_chunks = None
-
-        if iter_params is not None:
-            try:
-                concat_chunks.append(str(next(iter_params)))
-            except StopIteration:
-                iter_params = None
-
-    return concat_strings(
-        concat_chunks, strip_string=strip_string, max_length=max_length
-    )
-
-
-def concat_strings(
-    chunks, strip_string=strip_string, max_length=MAX_FORMAT_PARAM_LENGTH
-):
-    rv_remarks = []  # type: List[Any]
-    rv_original_length = 0
-    rv_length = 0
-    rv = []  # type: List[str]
-
-    def realign_remark(remark):
-        return [
-            (rv_length + x if isinstance(x, int_types) and i < 4 else x)
-            for i, x in enumerate(remark)
-        ]
-
-    for chunk in chunks:
-        if isinstance(chunk, AnnotatedValue):
-            # Assume it's already stripped!
-            stripped_chunk = chunk
-            chunk = chunk.value
-        else:
-            stripped_chunk = strip_string(chunk, max_length=max_length)
-
-        if isinstance(stripped_chunk, AnnotatedValue):
-            rv_remarks.extend(
-                realign_remark(remark) for remark in stripped_chunk.metadata["rem"]
-            )
-            stripped_chunk_value = stripped_chunk.value
-        else:
-            stripped_chunk_value = stripped_chunk
-
-        rv_original_length += len(chunk)
-        rv_length += len(stripped_chunk_value)  # type: ignore
-        rv.append(stripped_chunk_value)  # type: ignore
-
-    rv_joined = u"".join(rv)
-    assert len(rv_joined) == rv_length
-
-    if not rv_remarks:
-        return rv_joined
-
-    return AnnotatedValue(
-        value=rv_joined, metadata={"len": rv_original_length, "rem": rv_remarks}
-    )
-
-
 def _is_threading_local_monkey_patched():
     # type: () -> bool
     try:
         from gevent.monkey import is_object_patched  # type: ignore
 
-        if is_object_patched("_threading", "local"):
+        if is_object_patched("threading", "local"):
             return True
     except ImportError:
         pass
@@ -787,10 +697,6 @@ def _is_threading_local_monkey_patched():
     return False
 
 
-IS_THREADING_LOCAL_MONKEY_PATCHED = _is_threading_local_monkey_patched()
-del _is_threading_local_monkey_patched
-
-
 def _get_contextvars():
     # () -> (bool, Type)
     """
@@ -800,7 +706,7 @@ def _get_contextvars():
 
     https://github.com/gevent/gevent/issues/1407
     """
-    if not IS_THREADING_LOCAL_MONKEY_PATCHED:
+    if not _is_threading_local_monkey_patched():
         try:
             from contextvars import ContextVar  # type: ignore
 
@@ -830,7 +736,6 @@ def _get_contextvars():
 
 
 HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
-del _get_contextvars
 
 
 def transaction_from_function(func):

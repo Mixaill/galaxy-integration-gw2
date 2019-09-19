@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: sentry-sdk
-Version: 0.10.0
+Version: 0.12.1
 Summary: Python client for Sentry (https://getsentry.com)
 Home-page: https://github.com/getsentry/sentry-python
 Author: Sentry Team and Contributors
@@ -21,7 +21,7 @@ Classifier: Programming Language :: Python :: 3.5
 Classifier: Programming Language :: Python :: 3.6
 Classifier: Programming Language :: Python :: 3.7
 Classifier: Topic :: Software Development :: Libraries :: Python Modules
-Requires-Dist: urllib3
+Requires-Dist: urllib3 (>=1.9)
 Requires-Dist: certifi
 Provides-Extra: bottle
 Requires-Dist: bottle (>=0.12.13) ; extra == 'bottle'

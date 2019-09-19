@@ -8,7 +8,8 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
 
     from sentry_sdk.integrations.wsgi import _ScopedResponse
@@ -130,7 +131,7 @@ class FlaskRequestExtractor(RequestExtractor):
 
     def raw_data(self):
         # type: () -> bytes
-        return self.request.data
+        return self.request.get_data()
 
     def form(self):
         # type: () -> ImmutableMultiDict
