@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import json
 import os
 import sys
 import time
@@ -10,13 +11,16 @@ thirdparty = os.path.join(os.path.dirname(os.path.realpath(__file__)),'3rdparty\
 if thirdparty not in sys.path:
     sys.path.insert(0, thirdparty)
 
-from version import __version__
+#read manifest
+menifest = None
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest.json")) as manifest:
+    manifest = json.load(manifest)
 
-#Start sentry
+#start sentry
 import sentry_sdk
 sentry_sdk.init(
     "https://fd007739e0054f6baceed3131fbfdbe5@sentry.openwg.net/3",
-    release=("galaxy-integration-gw2@%s" % __version__))
+    release=("galaxy-integration-gw2@%s" % manifest['version']))
 
 from galaxy.api.errors import BackendError, InvalidCredentials
 from galaxy.api.consts import Platform, LicenseType, LocalGameState
@@ -34,8 +38,9 @@ class GuildWars2Plugin(Plugin):
     SLEEP_CHECK_RUNNING = 5
     SLEEP_CHECK_RUNNING_ITER = 0.01
 
+
     def __init__(self, reader, writer, token):
-        super().__init__(Platform.GuildWars2, __version__, reader, writer, token)
+        super().__init__(Platform(manifest['platform']), manifest['version'], reader, writer, token)
         self._gw2_api = GW2API()
         self._game_instances = None
         self.__task_check_for_instances = None
