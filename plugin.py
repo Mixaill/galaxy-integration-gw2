@@ -135,7 +135,7 @@ class GuildWars2Plugin(Plugin):
 
     def tick(self):
         if not self._task_check_for_running or self._task_check_for_running.done():
-            self._task_check_for_running = asyncio.create_task(self.task_check_for_running_func())
+            self._task_check_for_running = self.create_task(self.task_check_for_running_func(), "task_check_for_running_game")
 
 
     async def task_check_for_running_func(self):
