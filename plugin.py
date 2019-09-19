@@ -29,6 +29,8 @@ import gw2_localgame
 
 class GuildWars2Plugin(Plugin):
 
+    SLEEP_CHECK_INSTANCES = 60
+
     SLEEP_CHECK_RUNNING = 5
     SLEEP_CHECK_RUNNING_ITER = 0.01
 
@@ -36,6 +38,7 @@ class GuildWars2Plugin(Plugin):
         super().__init__(Platform.GuildWars2, __version__, reader, writer, token)
         self._gw2_api = GW2API()
         self._game_instances = None
+        self.__task_check_for_instances = None
         self._task_check_for_running  = None
         self._last_state = LocalGameState.None_
 
@@ -136,14 +139,19 @@ class GuildWars2Plugin(Plugin):
         if not self._task_check_for_running or self._task_check_for_running.done():
             self._task_check_for_running = self.create_task(self.task_check_for_running_func(), "task_check_for_running_game")
 
+        if not self.__task_check_for_instances or self.__task_check_for_instances.done():
+            self.__task_check_for_instances = self.create_task(self.task_check_for_game_instances(), "task_check_for_instances")
+
+
+    async def task_check_for_game_instances(self):
+        self._game_instances = gw2_localgame.get_game_instances()
+        await asyncio.sleep(self.SLEEP_CHECK_INSTANCES)
+
 
     async def task_check_for_running_func(self):
 
-        if self._last_state == LocalGameState.None_:
-            await asyncio.sleep(self.SLEEP_CHECK_RUNNING)
-            return
-
-        if not self._game_instances:
+        #skip status update if there is no instances
+        if self._last_state == LocalGameState.None_ and not self._game_instances:
             await asyncio.sleep(self.SLEEP_CHECK_RUNNING)
             return
 
