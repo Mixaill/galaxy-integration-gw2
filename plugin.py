@@ -153,22 +153,25 @@ class GuildWars2Plugin(Plugin):
             target_exes.append(instance.exe_name().lower())
 
         #check processes
-        running = False     
-        for proc_info in process_iter():
-            if proc_info.binary_path is None:
-                continue
-            if os.path.basename(proc_info.binary_path).lower() in target_exes:
-                running = True
-                break
-            await asyncio.sleep(self.SLEEP_CHECK_RUNNING_ITER)
+        running = False
+        if target_exes:    
+            for proc_info in process_iter():
+                if proc_info.binary_path is None:
+                    continue
+                if os.path.basename(proc_info.binary_path).lower() in target_exes:
+                    running = True
+                    break
+                await asyncio.sleep(self.SLEEP_CHECK_RUNNING_ITER)
 
         #update state
         new_state = None
         if running:
             self.persistent_cache['last_played'] = int(time.time())
             new_state = LocalGameState.Installed | LocalGameState.Running
-        else:
+        elif target_exes:
             new_state = LocalGameState.Installed
+        else:
+            new_state = LocalGameState.None_
 
         if self._last_state != new_state:
             self.update_local_game_status(LocalGame('guild_wars_2', new_state))
