@@ -199,12 +199,15 @@ class GW2API(object):
 
 
     def __api_get_account_info(self, api_key):
-        resp = requests.get(self.API_DOMAIN+self.API_URL_ACCOUNT, params={'access_token': api_key})
-
         result = None
+
+        resp = requests.get(self.API_DOMAIN+self.API_URL_ACCOUNT, params={'access_token': api_key})
+        
         try: 
             result = json.loads(resp.text)
         except Exception:
-            logging.error('gw2api/__api_get_account_info: %s' % resp.text)
+            if resp.status_code != 502:
+                logging.error('gw2api/__api_get_account_info: failed to parse response %s' % resp.text)
 
-        return (resp.status_code, json.loads(resp.text))
+
+        return (resp.status_code, result)
