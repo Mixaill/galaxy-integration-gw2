@@ -6,13 +6,11 @@ import time
 from typing import List
 
 #expand sys.path
-thirdparty =  os.path.join(os.path.dirname(os.path.realpath(__file__)),'3rdparty\\')
+thirdparty = os.path.join(os.path.dirname(os.path.realpath(__file__)),'3rdparty\\')
 if thirdparty not in sys.path:
     sys.path.insert(0, thirdparty)
 
 from version import __version__
-
-import psutil
 
 #Start sentry
 import sentry_sdk
@@ -24,6 +22,7 @@ from galaxy.api.errors import BackendError, InvalidCredentials
 from galaxy.api.consts import Platform, LicenseType, LocalGameState
 from galaxy.api.plugin import Plugin, create_and_run_plugin
 from galaxy.api.types import Authentication, NextStep, Dlc, LicenseInfo, Game, GameTime, LocalGame
+from galaxy.proc_tools import process_iter
 
 from gw2_api import GW2API
 import gw2_localgame
@@ -155,14 +154,12 @@ class GuildWars2Plugin(Plugin):
 
         #check processes
         running = False     
-        for process in psutil.process_iter():
-            try:
-                if process.name().lower() in target_exes:
-                    running = True
-                    break
-            except (psutil.AccessDenied, psutil.NoSuchProcess):
+        for proc_info in process_iter():
+            if proc_info.binary_path is None:
                 continue
-
+            if os.path.basename(proc_info.binary_path).lower() in target_exes:
+                running = True
+                break
             await asyncio.sleep(self.SLEEP_CHECK_RUNNING_ITER)
 
         #update state
