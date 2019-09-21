@@ -97,7 +97,10 @@ class GW2AuthorizationServer(BaseHTTPRequestHandler):
 class GW2API(object):
 
     API_DOMAIN = 'https://api.guildwars2.com'
+
+    API_URL_ACHIEVEMENTS = '/v2/achievements'
     API_URL_ACCOUNT = '/v2/account'
+    API_URL_ACCOUNT_ACHIVEMENTS = '/v2/account/achievements'
 
     LOCALSERVER_HOST = '127.0.0.1'
     LOCALSERVER_PORT = 13338
@@ -132,6 +135,28 @@ class GW2API(object):
 
     def get_account_age(self) -> int:
         return self._account_info['age']
+
+    def get_account_achievements(self) -> Dict:
+        result = dict()
+
+        (status, achievements_account) = self.__api_get_account_achievements(self._api_key)
+        if status == 200:
+            #select completed achievements
+            ids_to_request = list()
+            for achievement in achievements_account:
+                if achievement['done'] == True:
+                    ids_to_request.append(achievement['id'])
+                    result[achievement['id']] = None
+            
+            #get additional info
+            (status, achievements_info) = self.__api_get_achievements_info(ids_to_request)
+            if status == 200 or status == 206:
+                for achievement in achievements_info:
+                    result[achievement['id']] = achievement['name']
+
+            
+        return result
+
 
     #
     # Authorization server
@@ -202,16 +227,27 @@ class GW2API(object):
         return GW2AuthorizationResult.FINISHED
 
 
-    def __api_get_account_info(self, api_key):
+
+    def __api_get_response(self, api_key, url, parameters):
         result = None
 
-        resp = requests.get(self.API_DOMAIN+self.API_URL_ACCOUNT, params={'access_token': api_key})
-        
+        resp = requests.get(self.API_DOMAIN+url, params=parameters)  
         try: 
             result = json.loads(resp.text)
         except Exception:
             if resp.status_code != 502:
-                logging.error('gw2api/__api_get_account_info: failed to parse response %s' % resp.text)
-
+                logging.error('gw2_api/__api_get_response: failed to parse response %s' % resp.text)
 
         return (resp.status_code, result)
+
+
+    def __api_get_account_info(self, api_key):
+        return self.__api_get_response(api_key, self.API_URL_ACCOUNT, {'access_token': api_key})
+
+
+    def __api_get_account_achievements(self, api_key):
+        return self.__api_get_response(api_key, self.API_URL_ACCOUNT_ACHIVEMENTS, {'access_token': api_key})
+
+
+    def __api_get_achievements_info(self, ids : List[int]):
+        return self.__api_get_response(self, self.API_URL_ACHIEVEMENTS, {'ids': ','.join(str(i) for i in ids)})

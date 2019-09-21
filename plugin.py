@@ -4,7 +4,7 @@ import json
 import os
 import sys
 import time
-from typing import List
+from typing import Any, List
 
 #expand sys.path
 thirdparty = os.path.join(os.path.dirname(os.path.realpath(__file__)),'3rdparty\\')
@@ -25,13 +25,18 @@ sentry_sdk.init(
 from galaxy.api.errors import BackendError, InvalidCredentials
 from galaxy.api.consts import Platform, LicenseType, LocalGameState
 from galaxy.api.plugin import Plugin, create_and_run_plugin
-from galaxy.api.types import Authentication, NextStep, Dlc, LicenseInfo, Game, GameTime, LocalGame
+from galaxy.api.types import Achievement, Authentication, NextStep, Dlc, LicenseInfo, Game, GameTime, LocalGame
 from galaxy.proc_tools import process_iter
 
 from gw2_api import GW2API
 import gw2_localgame
 
 class GuildWars2Plugin(Plugin):
+
+    GAME_ID = 'guild_wars_2'
+    GAME_NAME = 'Guild Wars 2'
+
+    SLEEP_CHECK_ACHIEVEMENTS = 1500
 
     SLEEP_CHECK_INSTANCES = 60
 
@@ -43,9 +48,14 @@ class GuildWars2Plugin(Plugin):
         super().__init__(Platform(manifest['platform']), manifest['version'], reader, writer, token)
         self._gw2_api = GW2API()
         self._game_instances = None
+
+        self.__task_check_for_achievements = None
         self.__task_check_for_instances = None
         self._task_check_for_running  = None
+
         self._last_state = LocalGameState.None_
+        self.__imported_achievements = None
+
 
     async def authenticate(self, stored_credentials=None):
         if not stored_credentials:
@@ -72,6 +82,7 @@ class GuildWars2Plugin(Plugin):
             
             return Authentication(self._gw2_api.get_account_id(), self._gw2_api.get_account_name())
 
+
     async def pass_login_credentials(self, step, credentials, cookies):
         self._gw2_api.auth_server_stop()
 
@@ -83,6 +94,7 @@ class GuildWars2Plugin(Plugin):
         self.store_credentials({'api_key': api_key})
         return Authentication(self._gw2_api.get_account_id(), self._gw2_api.get_account_name())
 
+
     async def get_local_games(self):
         self._game_instances = gw2_localgame.get_game_instances()
         if len(self._game_instances) == 0:
@@ -90,7 +102,8 @@ class GuildWars2Plugin(Plugin):
             return []
 
         self._last_state = LocalGameState.Installed
-        return [ LocalGame(game_id='guild_wars_2', local_game_state = self._last_state)]
+        return [ LocalGame(game_id=self.GAME_ID, local_game_state = self._last_state) ]
+
 
     async def get_owned_games(self):
         free_to_play = False
@@ -116,28 +129,53 @@ class GuildWars2Plugin(Plugin):
         if free_to_play:
             license_type = LicenseType.FreeToPlay
 
-        return [ Game(game_id = 'guild_wars_2', game_title = 'Guild Wars 2', dlcs = dlcs, license_info = LicenseInfo(license_type = license_type)) ]
+        return [ Game(game_id = self.GAME_ID, game_title = self.GAME_NAME, dlcs = dlcs, license_info = LicenseInfo(license_type = license_type)) ]
 
 
     async def get_game_time(self, game_id, context):
+        if game_id != self.GAME_ID:
+            logging.warn('plugin/get_game_time: unknown game_id %s' % game_id)
+            return None
+
         time_played = None
         last_played_time = None
-        if game_id == 'guild_wars_2':
-            time_played = int(self._gw2_api.get_account_age() / 60)
-            last_played_time = self.persistent_cache.get('last_played')
+        
+        time_played = int(self._gw2_api.get_account_age() / 60)
+        last_played_time = self.persistent_cache.get('last_played')
 
         return GameTime(game_id = game_id, time_played = time_played, last_played_time = last_played_time)
 
 
     async def launch_game(self, game_id):
-        if game_id != 'guild_wars_2':
+        if game_id != self.GAME_ID:
+            logging.warn('plugin/launch_game: unknown game_id %s' % game_id)
             return
         
         self._game_instances[0].run_game()
 
 
     async def install_game(self, game_id):
-        pass
+        if game_id != self.GAME_ID:
+            logging.warn('plugin/install_game: unknown game_id %s' % game_id)
+            return
+
+
+    async def get_unlocked_achievements(self, game_id: str, context: Any) -> List[Achievement]:
+        result = list()
+
+        if game_id != self.GAME_ID:
+            logging.warn('plugin/get_unlocked_achievements: unknown game_id %s' % game_id)
+            return result
+
+        if not self.__imported_achievements:
+            self.__imported_achievements = list()
+
+        self.__imported_achievements.clear()
+        for key, value in self._gw2_api.get_account_achievements().items():
+            self.__imported_achievements.append(key)
+            result.append(Achievement(0, key, value))
+
+        return result
 
 
     def tick(self):
@@ -146,6 +184,19 @@ class GuildWars2Plugin(Plugin):
 
         if not self.__task_check_for_instances or self.__task_check_for_instances.done():
             self.__task_check_for_instances = self.create_task(self.task_check_for_game_instances(), "task_check_for_instances")
+
+        if not self.__task_check_for_achievements or self.__task_check_for_achievements.done():
+            self.__task_check_for_achievements = self.create_task(self.task_check_for_achievements(), "task_check_for_achievements")
+
+
+    async def task_check_for_achievements(self):
+        if self.__imported_achievements:
+            for key, value in self._gw2_api.get_account_achievements().items():
+                if key not in self.__imported_achievements:
+                    self.__imported_achievements.append(key)
+                    self.unlock_achievement(self.GAME_ID, Achievement(0, key, value))
+
+        await asyncio.sleep(self.SLEEP_CHECK_ACHIEVEMENTS)
 
 
     async def task_check_for_game_instances(self):
