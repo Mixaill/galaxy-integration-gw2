@@ -137,9 +137,6 @@ class GuildWars2Plugin(Plugin):
             logging.warn('plugin/get_game_time: unknown game_id %s' % game_id)
             return None
 
-        time_played = None
-        last_played_time = None
-        
         time_played = int(self._gw2_api.get_account_age() / 60)
         last_played_time = self.persistent_cache.get('last_played')
 
@@ -172,9 +169,13 @@ class GuildWars2Plugin(Plugin):
 
         self.__imported_achievements.clear()
         for key, value in self._gw2_api.get_account_achievements().items():
-            self.__imported_achievements.append(key)
-            result.append(Achievement(0, key, value))
+            cache_key = 'achievement_%s' % key
+            if cache_key not in self.persistent_cache:
+                self.persistent_cache[cache_key] = int(time.time())
 
+            result.append(Achievement(self.persistent_cache.get(cache_key), key, value))
+
+        self.push_cache()
         return result
 
 
@@ -231,6 +232,7 @@ class GuildWars2Plugin(Plugin):
         new_state = None
         if running:
             self.persistent_cache['last_played'] = int(time.time())
+            self.push_cache()
             new_state = LocalGameState.Installed | LocalGameState.Running
         elif target_exes:
             new_state = LocalGameState.Installed
