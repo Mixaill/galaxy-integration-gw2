@@ -228,10 +228,11 @@ class GW2API(object):
 
 
 
-    def __api_get_response(self, api_key, url, parameters):
+    def __api_get_response(self, api_key, url, parameters = None):
         result = None
 
-        resp = requests.get(self.API_DOMAIN+url, params=parameters)  
+        header = {'Authorization': 'Bearer ' + api_key}
+        resp = requests.get(self.API_DOMAIN+url, params=parameters, headers = header)
         try: 
             result = json.loads(resp.text)
         except Exception:
@@ -242,12 +243,12 @@ class GW2API(object):
 
 
     def __api_get_account_info(self, api_key):
-        return self.__api_get_response(api_key, self.API_URL_ACCOUNT, {'access_token': api_key})
+        return self.__api_get_response(api_key, self.API_URL_ACCOUNT)
 
 
     def __api_get_account_achievements(self, api_key):
-        return self.__api_get_response(api_key, self.API_URL_ACCOUNT_ACHIVEMENTS, {'access_token': api_key})
+        return self.__api_get_response(api_key, self.API_URL_ACCOUNT_ACHIVEMENTS)
 
 
-    def __api_get_achievements_info(self, ids : List[int]):
-        return self.__api_get_response(self, self.API_URL_ACHIEVEMENTS, {'ids': ','.join(str(i) for i in ids)})
+    def __api_get_achievements_info(self, api_key, ids : List[int]):
+        return self.__api_get_response(api_key, self.API_URL_ACHIEVEMENTS, 'ids=' + ','.join(str(i) for i in ids))
