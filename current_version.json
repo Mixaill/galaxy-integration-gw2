@@ -1,8 +1,8 @@
 {
-    "tag_name": "v0.2.4",
+    "tag_name": "v0.2.5",
     "assets": [
         {
-            "browser_download_url": "https://github.com/Mixaill/galaxy-integration-gw2/archive/v0.2.4.zip",
+            "browser_download_url": "https://github.com/Mixaill/galaxy-integration-gw2/archive/v0.2.5.zip",
             "name": "windows.zip"
         }
     ]

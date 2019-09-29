@@ -147,14 +147,22 @@ class GW2API(object):
                 if achievement['done'] == True:
                     ids_to_request.append(achievement['id'])
                     result[achievement['id']] = None
-            
-            #get additional info
-            (status, achievements_info) = self.__api_get_achievements_info(ids_to_request)
-            if status == 200 or status == 206:
-                for achievement in achievements_info:
-                    result[achievement['id']] = achievement['name']
 
-            
+            #chunk requests
+            def chunks(l, n):
+                for i in range(0, len(l), n):
+                    yield l[i:i + n]
+            chunks = list(chunks(ids_to_request, 100))
+
+            #get additional info
+            for chunk in chunks:
+                (status, achievements_info) = self.__api_get_achievements_info(self._api_key, chunk)
+                if status == 200 or status == 206:
+                    for achievement in achievements_info:
+                        result[achievement['id']] = achievement['name']
+                else:
+                    logging.error('GW2API/get_account_achievements: failed to get achievements info, code %s' % status)
+
         return result
 
 
