@@ -5,6 +5,7 @@ import os
 import sys
 import time
 from typing import Any, List
+import webbrowser
 
 #expand sys.path
 thirdparty = os.path.join(os.path.dirname(os.path.realpath(__file__)),'3rdparty\\')
@@ -155,7 +156,7 @@ class GuildWars2Plugin(Plugin):
         if game_id != self.GAME_ID:
             logging.warn('plugin/install_game: unknown game_id %s' % game_id)
             return
-
+        webbrowser.open('https://account.arena.net/welcome')
 
     async def get_unlocked_achievements(self, game_id: str, context: Any) -> List[Achievement]:
         result = list()
