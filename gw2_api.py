@@ -160,6 +160,9 @@ class GW2API(object):
                 if status == 200 or status == 206:
                     for achievement in achievements_info:
                         result[achievement['id']] = achievement['name']
+                elif 'text' in achievements_info:
+                    if achievements_info['text'] == 'all ids provided are invalid':
+                        logging.warning('GW2API/get_account_achievement: all IDs are invalid')
                 else:
                     logging.error('GW2API/get_account_achievements: failed to get achievements info, code %s' % status)
 
@@ -244,8 +247,12 @@ class GW2API(object):
         try: 
             result = json.loads(resp.text)
         except Exception:
-            if resp.status_code != 502:
-                logging.error('gw2_api/__api_get_response: failed to parse response %s' % resp.text)
+            if resp.status_code == 404:
+                logging.error('gw2_api/__api_get_response: NOT FOUND for url %s' % url)
+            elif resp.status_code == 502:
+                logging.warning('gw2_api/__api_get_response: BAD GATEWAY for url %s' % url)
+            else:
+                logging.error('gw2_api/__api_get_response: failed to parse response %s for url %s' % (resp.text, url))
 
         return (resp.status_code, result)
 
