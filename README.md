@@ -4,7 +4,7 @@ GOG Galaxy 2.0 Guild Wars 2 integration
 
 ## Installation
 
-* Unpack latest archive from Clone https://github.com/Mixaill/galaxy-integration-gw2/releases to `%localappdata%\GOG.com\Galaxy\plugins\installed\gw2\`
+* Unpack latest archive from https://github.com/Mixaill/galaxy-integration-gw2/releases to `%localappdata%\GOG.com\Galaxy\plugins\installed\gw2\`
 
 ## Changelog
 
