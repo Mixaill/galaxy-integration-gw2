@@ -149,7 +149,22 @@ class GuildWars2Plugin(Plugin):
             logging.warn('plugin/launch_game: unknown game_id %s' % game_id)
             return
         
-        self._game_instances[0].run_game()
+        try:
+            self._game_instances[0].run_game()
+        except FileNotFoundError:
+            logging.warning('plugin/launch_game: game executable is not found')
+            self.update_local_game_status(LocalGame(game_id, LocalGameState.None_))
+
+
+    async def uninstall_game(self, game_id):
+        if game_id != self.GAME_ID:
+            logging.warn('plugin/uninstall_game: unknown game_id %s' % game_id)
+            return
+        try:
+            self._game_instances[0].uninstall_game()
+        except FileNotFoundError:
+            logging.warning('plugin/uninstall_game: game executable is not found')
+            self.update_local_game_status(LocalGame(game_id, LocalGameState.None_))
 
 
     async def install_game(self, game_id):
@@ -157,6 +172,7 @@ class GuildWars2Plugin(Plugin):
             logging.warn('plugin/install_game: unknown game_id %s' % game_id)
             return
         webbrowser.open('https://account.arena.net/welcome')
+
 
     async def get_unlocked_achievements(self, game_id: str, context: Any) -> List[Achievement]:
         result = list()

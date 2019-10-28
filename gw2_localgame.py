@@ -15,6 +15,9 @@ class GWLocalGame(object):
     def run_game(self) -> None:
         subprocess.Popen([os.path.join(self._dir,self._executable)], creationflags=0x00000008, cwd = self._dir)
 
+    def uninstall_game(self) -> None:
+        subprocess.Popen([os.path.join(self._dir,self._executable), '--uninstall'], creationflags=0x00000008, cwd = self._dir)
+
 
 def get_game_instances() -> List[GWLocalGame]:
     result = list()
