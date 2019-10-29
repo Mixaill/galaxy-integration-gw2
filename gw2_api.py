@@ -64,6 +64,8 @@ class GW2AuthorizationServer(BaseHTTPRequestHandler):
             self.send_header('Location','/finished')
         elif auth_result == GW2AuthorizationResult.FAILED_NO_ACCOUNT:
             self.send_header('Location', '/login_noaccount')
+        elif auth_result == GW2AuthorizationResult.FAILED_BAD_DATA:
+            self.send_header('Location', '/login_baddata')
         else:
             self.send_header('Location','/login_failed')
 
