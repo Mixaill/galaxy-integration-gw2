@@ -20,7 +20,7 @@ with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest.jso
 #start sentry
 import sentry_sdk
 sentry_sdk.init(
-    "https://fd007739e0054f6baceed3131fbfdbe5@sentry.openwg.net/3",
+    "https://3c02d1d2adbf40cf9b878e952fe0778d@sentry.friends-of-friends-of-galaxy.org/3",
     release=("galaxy-integration-gw2@%s" % manifest['version']))
 
 from galaxy.api.errors import BackendError, InvalidCredentials
