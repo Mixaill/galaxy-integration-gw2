@@ -78,11 +78,12 @@ class GW2AuthorizationServer(BaseHTTPRequestHandler):
         response_content = ""
 
         try:
-            filepath = os.path.join(os.path.dirname(os.path.realpath(__file__)),'html\\%s.html' % self.path)
+            enduri = self.path[1:] if self.path.startswith('/') else self.path
+            filepath = os.path.join(os.path.dirname(os.path.realpath(__file__)),'html','%s.html' % enduri)
             if os.path.isfile(filepath):
                 response_content = open(filepath).read()
             else:
-                filepath = os.path.join(os.path.dirname(os.path.realpath(__file__)),'html\\404.html')
+                filepath = os.path.join(os.path.dirname(os.path.realpath(__file__)),'html','404.html')
                 if os.path.isfile(filepath):
                     response_content = open(filepath).read()
                 else:
