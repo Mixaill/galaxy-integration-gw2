@@ -10,18 +10,32 @@ import xml.etree.ElementTree as ElementTree
 
 class GWLocalGame(object):
     def __init__(self, game_dir, game_executable):
-        self._dir = game_dir
-        self._executable = game_executable
-        self._creationflags = 0x00000008 if platform.system() == 'Windows' else 0
+        self.__logger = logging.getLogger('gw2_local_game')
+        self.__directory = game_dir
+        self.__executable = game_executable
+        self.__creationflags = 0x00000008 if platform.system() == 'Windows' else 0
+
+    def get_app_size(self) -> int:
+        total_size = 0
+        try:
+            for dirpath, _, filenames in os.walk(self.__directory):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    if not os.path.islink(fp):
+                        total_size += os.path.getsize(fp)
+        except Exception:
+            self.__logger.exception('get_app_size:')
+
+        return total_size
 
     def exe_name(self) -> str:
-        return os.path.basename(self._executable)
+        return os.path.basename(self.__executable)
 
     def run_game(self) -> None:
-        subprocess.Popen([os.path.join(self._dir,self._executable)], creationflags=self._creationflags, cwd=self._dir)
+        subprocess.Popen([os.path.join(self.__directory, self.__executable)], creationflags=self.__creationflags, cwd=self.__directory)
 
     def uninstall_game(self) -> None:
-        subprocess.Popen([os.path.join(self._dir,self._executable), '--uninstall'], creationflags=self._creationflags, cwd=self._dir)
+        subprocess.Popen([os.path.join(self.__directory, self.__executable), '--uninstall'], creationflags=self.__creationflags, cwd=self.__directory)
 
 
 def get_game_instances() -> List[GWLocalGame]:
