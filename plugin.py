@@ -33,10 +33,14 @@ menifest = None
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest.json")) as manifest:
     manifest = json.load(manifest)
 
+#disable urllib3 logging
+import urllib3
+logging.getLogger("urllib3").propagate = False
+
 #start sentry
 import sentry_sdk
 sentry_sdk.init(
-    "https://3c02d1d2adbf40cf9b878e952fe0778d@sentry.friends-of-friends-of-galaxy.org/3",
+    "https://801708b080aa4699beb708e5ac909cc9@sentry.friends-of-friends-of-galaxy.org/3",
     release=("galaxy-integration-gw2@%s" % manifest['version']))
 
 from galaxy.api.errors import BackendError, InvalidCredentials
