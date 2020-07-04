@@ -105,3 +105,8 @@ venv.bak/
 .vscode/
 
 3rdparty/
+3rdparty_*/
+
+#macOS
+.DS_Store
+

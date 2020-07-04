@@ -2,14 +2,27 @@ import asyncio
 import logging
 import json
 import os
+import platform
 import sys
 import time
 from typing import Any, List
 import webbrowser
 
+#platform helper
+def get_platform() -> str:
+    system = platform.system()
+    if system == 'Windows':
+        return 'windows'
+
+    if system == 'Darwin':
+        return 'macos'
+
+    logging.error('plugin/get_platform: unknown platform %s' % system)
+    return 'unknown'
+
 #expand sys.path
-thirdparty = os.path.join(os.path.dirname(os.path.realpath(__file__)),'3rdparty\\')
-if thirdparty not in sys.path:
+thirdparty =  os.path.join(os.path.dirname(os.path.realpath(__file__)),'3rdparty_%s/' % get_platform())
+if thirdparty not in sys.path and os.path.exists(thirdparty):
     sys.path.insert(0, thirdparty)
 
 #read manifest
