@@ -286,7 +286,7 @@ class GuildWars2Plugin(Plugin):
         if not self._game_instances:
             return None
 
-        return self._game_instances[0].get_app_size()
+        return await self._game_instances[0].get_app_size()
 
     #
     # Other

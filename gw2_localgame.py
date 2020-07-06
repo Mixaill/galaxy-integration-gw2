@@ -1,6 +1,7 @@
 # (c) 2019-2020 Mikhail Paulyshka
 # SPDX-License-Identifier: MIT
 
+import asyncio
 import logging
 import os
 import platform
@@ -15,11 +16,12 @@ class GWLocalGame(object):
         self.__executable = game_executable
         self.__creationflags = 0x00000008 if platform.system() == 'Windows' else 0
 
-    def get_app_size(self) -> int:
+    async def get_app_size(self) -> int:
         total_size = 0
         try:
             for dirpath, _, filenames in os.walk(self.__directory):
                 for f in filenames:
+                    await asyncio.sleep(0)
                     fp = os.path.join(dirpath, f)
                     if not os.path.islink(fp):
                         total_size += os.path.getsize(fp)
