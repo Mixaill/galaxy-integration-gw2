@@ -49,8 +49,9 @@ from galaxy.api.plugin import Plugin, create_and_run_plugin
 from galaxy.api.types import Achievement, Authentication, NextStep, Dlc, LicenseInfo, Game, GameTime, LocalGame
 from galaxy.proc_tools import process_iter
 
-from gw2_api import GW2API
-import gw2_localgame
+import gw2.gw2_api
+import gw2.gw2_authserver
+import gw2.gw2_localgame
 
 class GuildWars2Plugin(Plugin):
     """
@@ -89,7 +90,7 @@ class GuildWars2Plugin(Plugin):
     def __init__(self, reader, writer, token):
         super().__init__(Platform(manifest['platform']), manifest['version'], reader, writer, token)
 
-        self._gw2_api = GW2API()
+        self._gw2_api = gw2.gw2_api.GW2API()
         self._game_instances = None
 
         self.__task_check_for_achievements = None
@@ -107,23 +108,25 @@ class GuildWars2Plugin(Plugin):
 
     async def authenticate(self, stored_credentials=None):
         if not stored_credentials:
+            self.__authserver = gw2.gw2_authserver.Gw2AuthServer(self._gw2_api)
+
             logging.info('No stored credentials')
 
             AUTH_PARAMS = {
                 "window_title": "Login to Guild Wars 2",
                 "window_width": 640,
                 "window_height": 460,
-                "start_uri": self._gw2_api.auth_server_uri(),
+                "start_uri": self.__authserver.get_uri(),
                 "end_uri_regex": '.*finished'
             }
 
-            if not self._gw2_api.auth_server_start():
+            if not await self.__authserver.start():
                 raise BackendError()
 
             return NextStep("web_session", AUTH_PARAMS)
 
         else:
-            auth_passed = self._gw2_api.do_auth_apikey(stored_credentials['api_key'])
+            auth_passed = await self._gw2_api.do_auth_apikey(stored_credentials['api_key'])
             if not auth_passed:
                 logging.warning('plugin/authenticate: stored credentials are invalid')
                 raise InvalidCredentials()
@@ -132,7 +135,8 @@ class GuildWars2Plugin(Plugin):
 
 
     async def pass_login_credentials(self, step, credentials, cookies):
-        self._gw2_api.auth_server_stop()
+        if self.__authserver is not None:
+            await self.__authserver.shutdown()
 
         api_key = self._gw2_api.get_api_key()
         if not api_key:
@@ -177,7 +181,7 @@ class GuildWars2Plugin(Plugin):
     #
 
     async def get_local_games(self):
-        self._game_instances = gw2_localgame.get_game_instances()
+        self._game_instances = gw2.gw2_localgame.get_game_instances()
         if len(self._game_instances) == 0:
             self._last_state = LocalGameState.None_
             return []
@@ -264,7 +268,7 @@ class GuildWars2Plugin(Plugin):
             self.__imported_achievements = list()
 
         self.__imported_achievements.clear()
-        for key, value in self._gw2_api.get_account_achievements().items():
+        for key, value in (await self._gw2_api.get_account_achievements()).items():
             cache_key = 'achievement_%s' % key
             if cache_key not in self.persistent_cache:
                 self.persistent_cache[cache_key] = int(time.time())
@@ -302,6 +306,9 @@ class GuildWars2Plugin(Plugin):
         if not self.__task_check_for_achievements or self.__task_check_for_achievements.done():
             self.__task_check_for_achievements = self.create_task(self.task_check_for_achievements(), "task_check_for_achievements")
 
+    async def shutdown(self) -> None:
+        await self._gw2_api.shutdown()
+
     #
     # Internals
     #
@@ -317,7 +324,7 @@ class GuildWars2Plugin(Plugin):
 
 
     async def task_check_for_game_instances(self):
-        self._game_instances = gw2_localgame.get_game_instances()
+        self._game_instances = gw2.gw2_localgame.get_game_instances()
         await asyncio.sleep(self.SLEEP_CHECK_INSTANCES)
 
 
