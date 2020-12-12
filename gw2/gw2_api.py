@@ -65,7 +65,7 @@ class GW2API(object):
     def get_owned_games(self) -> List[str]:
         if self._account_info is None:
             self.__logger.error('get_owned_games: account info is None', exc_info=True)
-            return None
+            return list()
 
         return self._account_info['access']
 
@@ -134,6 +134,9 @@ class GW2API(object):
 
             if account_info['text'] == 'ErrBadData':
                 return GW2AuthorizationResult.FAILED_BAD_DATA
+
+            if account_info['text'] == 'ErrTimeout':
+                return GW2AuthorizationResult.FAILED_TIMEOUT
 
             logging.error('do_auth_apikey: %s, %s' % (status_code, account_info))
             return GW2AuthorizationResult.FAILED
