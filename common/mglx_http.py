@@ -1,6 +1,7 @@
 # (c) 2019-2020 Mikhail Paulyshka
 # SPDX-License-Identifier: MIT
 
+import asyncio
 import collections
 import logging
 import ssl
@@ -54,7 +55,24 @@ class MglxHttp:
                         method = 'GET'
                     else:
                         break
+            except aiohttp.ClientConnectionError:
+                self.__logger.warn('request: [%s]%s --> aiohttp.ClientConnectionError' % (method, url))
+                response_status = 0
+                break
+            except asyncio.CancelledError:
+                self.__logger.warn('request: [%s]%s --> asyncio.CancelledError' % (method, url))
+                response_status = 499 #499 Client Closed Request
+                break
+            except asyncio.TimeoutError:
+                self.__logger.warn('request: [%s]%s --> asyncio.TimeoutError' % (method, url))
+                response_status = 408 #408 Request Timeout
+                break
+            except RuntimeError:
+                self.__logger.warn('request: [%s]%s --> RuntimeError' % (method, url))
+                response_status = 0
+                break
             except TimeoutError:
+                self.__logger.warn('request: [%s]%s --> TimeoutError' % (method, url))
                 response_status = 408 #408 Request Timeout
                 break
 
