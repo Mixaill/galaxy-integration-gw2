@@ -40,15 +40,19 @@ class GWLocalGame(object):
         subprocess.Popen([os.path.join(self.__directory, self.__executable), '--uninstall'], creationflags=self.__creationflags, cwd=self.__directory)
 
 
-def get_game_instances() -> List[GWLocalGame]:
+def get_game_instances_macos() -> List[GWLocalGame]:
     result = list()
+    game_location = '/Applications/Guild Wars 2 64-bit.app'
+    executable = 'Contents/MacOS/GuildWars2'
+    
+    if os.path.exists(os.path.join(game_location, executable)):
+        result.append(GWLocalGame(game_location, executable))
+    
+    return result
 
-    if platform.system() == 'Darwin':
-        game_location = '/Applications/Guild Wars 2 64-bit.app'
-        executable = 'Contents/MacOS/GuildWars2'
-        if os.path.exists(os.path.join(game_location, executable)):
-            result.append(GWLocalGame(game_location, executable))
-        return result
+
+def get_game_instances_windows() -> List[GWLocalGame]:
+    result = list()
 
     config_dir = os.path.expandvars('%APPDATA%\\Guild Wars 2\\')
     if not os.path.exists(config_dir):
@@ -58,12 +62,21 @@ def get_game_instances() -> List[GWLocalGame]:
         for file_n in files:
             file_name = file_n.lower()
             if file_name.startswith('gfxsettings') and file_name.endswith('.exe.xml'):
-                config = ElementTree.parse(os.path.join(config_dir,file_name)).getroot()
+                try:
+                    config = ElementTree.parse(os.path.join(config_dir,file_name)).getroot()
 
-                game_dir = config.find('APPLICATION/INSTALLPATH').attrib['Value']
-                game_executable = config.find('APPLICATION/EXECUTABLE').attrib['Value']
+                    game_dir = config.find('APPLICATION/INSTALLPATH').attrib['Value']
+                    game_executable = config.find('APPLICATION/EXECUTABLE').attrib['Value']
 
-                if os.path.exists(os.path.join(game_dir,game_executable)):
-                    result.append(GWLocalGame(game_dir.lower(),game_executable.lower()))
+                    if os.path.exists(os.path.join(game_dir,game_executable)):
+                        result.append(GWLocalGame(game_dir.lower(),game_executable.lower()))
+                except PermissionError:
+                    logging.getLogger('gw2_local_game').warn('get_game_instances_windows: permission error')
 
     return result
+
+def get_game_instances() -> List[GWLocalGame]:
+    if platform.system() == 'Darwin':
+        return get_game_instances_macos()
+    else:
+        return get_game_instances_windows()
