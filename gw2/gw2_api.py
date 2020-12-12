@@ -114,31 +114,37 @@ class GW2API(object):
     #
 
     async def do_auth_apikey(self, api_key : str) -> GW2AuthorizationResult:
-        (status_code, account_info) = await self.__api_get_account_info(api_key)
+        self._api_key = None
+        self._account_info = None
 
-        if account_info is None:
+        if not api_key: 
+            self.__logger.warn('do_auth_apikey: api_key is is None')
             return GW2AuthorizationResult.FAILED
 
+        (status_code, account_info) = await self.__api_get_account_info(api_key)
+ 
         if status_code != 200:
-            if 'text' not in account_info:
-                return GW2AuthorizationResult.FAILED
+            if 'text' in account_info:
+                if account_info['text'] == 'Invalid access token':
+                    return GW2AuthorizationResult.FAILED_INVALID_TOKEN
 
-            if account_info['text'] == 'Invalid access token':
-                return GW2AuthorizationResult.FAILED_INVALID_TOKEN
+                if account_info['text'] == 'invalid key':
+                    return GW2AuthorizationResult.FAILED_INVALID_KEY
 
-            if account_info['text'] == 'invalid key':
-                return GW2AuthorizationResult.FAILED_INVALID_KEY
+                if account_info['text'] == 'no game account':
+                    return GW2AuthorizationResult.FAILED_NO_ACCOUNT
 
-            if account_info['text'] == 'no game account':
-                return GW2AuthorizationResult.FAILED_NO_ACCOUNT
+                if account_info['text'] == 'ErrBadData':
+                    return GW2AuthorizationResult.FAILED_BAD_DATA
 
-            if account_info['text'] == 'ErrBadData':
-                return GW2AuthorizationResult.FAILED_BAD_DATA
+                if account_info['text'] == 'ErrTimeout':
+                    return GW2AuthorizationResult.FAILED_TIMEOUT
 
-            if account_info['text'] == 'ErrTimeout':
-                return GW2AuthorizationResult.FAILED_TIMEOUT
+            self.__logger.error('do_auth_apikey: %s, %s' % (status_code, account_info))
+            return GW2AuthorizationResult.FAILED
 
-            logging.error('do_auth_apikey: %s, %s' % (status_code, account_info))
+        if account_info is None:
+            self.__logger.warn('do_auth_apikey: account info is None')
             return GW2AuthorizationResult.FAILED
 
         self._api_key = api_key
