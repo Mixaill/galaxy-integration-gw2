@@ -93,6 +93,8 @@ class GuildWars2Plugin(Plugin):
     def __init__(self, reader, writer, token):
         super().__init__(Platform(manifest['platform']), manifest['version'], reader, writer, token)
 
+        self.__logger = logging.getLogger('plugin')
+
         self._gw2_api = gw2.gw2_api.GW2API()
         self._game_instances = None
 
@@ -110,31 +112,30 @@ class GuildWars2Plugin(Plugin):
     #
 
     async def authenticate(self, stored_credentials=None):
-        if not stored_credentials:
-            self.__authserver = gw2.gw2_authserver.Gw2AuthServer(self._gw2_api)
-
-            logging.info('No stored credentials')
-
-            AUTH_PARAMS = {
-                "window_title": "Login to Guild Wars 2",
-                "window_width": 640,
-                "window_height": 460,
-                "start_uri": self.__authserver.get_uri(),
-                "end_uri_regex": '.*finished'
-            }
-
-            if not await self.__authserver.start():
-                raise BackendError()
-
-            return NextStep("web_session", AUTH_PARAMS)
-
-        else:
-            auth_passed = await self._gw2_api.do_auth_apikey(stored_credentials['api_key'])
-            if not auth_passed:
-                logging.warning('plugin/authenticate: stored credentials are invalid')
+        #check stored credentials
+        if stored_credentials:
+            auth_result = await self._gw2_api.do_auth_apikey(stored_credentials['api_key'])
+            if auth_result != gw2.gw2_api.GW2AuthorizationResult.FINISHED:
+                self.__logger.warning('authenticate: stored credentials are invalid')
                 raise InvalidCredentials()
-            
+
             return Authentication(self._gw2_api.get_account_id(), self._gw2_api.get_account_name())
+
+        #new auth
+        self.__authserver = gw2.gw2_authserver.Gw2AuthServer(self._gw2_api)
+        self.__logger.info('authenticate: no stored credentials')
+
+        AUTH_PARAMS = {
+            "window_title": "Login to Guild Wars 2",
+            "window_width": 640,
+            "window_height": 460,
+            "start_uri": self.__authserver.get_uri(),
+            "end_uri_regex": '.*finished'
+        }
+        if not await self.__authserver.start():
+            self.__logger.error('authenticate: failed to start auth server', exc_info=True)
+            raise BackendError()
+        return NextStep("web_session", AUTH_PARAMS)
 
 
     async def pass_login_credentials(self, step, credentials, cookies):
@@ -142,12 +143,14 @@ class GuildWars2Plugin(Plugin):
             await self.__authserver.shutdown()
 
         api_key = self._gw2_api.get_api_key()
-        if not api_key:
-            logging.error('plugin/pass_login_credentials: api_key is None!')
+        account_id = self._gw2_api.get_account_id()
+        account_name = self._gw2_api.get_account_name()
+        if (api_key is None) or (account_id is None) or (account_name is None):
+            self.__logger.error('pass_login_credentials: invalid credentials')
             raise InvalidCredentials()
 
         self.store_credentials({'api_key': api_key})
-        return Authentication(self._gw2_api.get_account_id(), self._gw2_api.get_account_name())
+        return Authentication(account_id, account_name)
 
     #
     # ImportOwnedGames
