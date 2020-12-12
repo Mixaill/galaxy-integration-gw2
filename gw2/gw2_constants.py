@@ -9,4 +9,5 @@ class GW2AuthorizationResult(Enum):
     FAILED_INVALID_KEY = 2
     FAILED_NO_ACCOUNT = 3
     FAILED_BAD_DATA = 4
-    FINISHED = 5
+    FAILED_TIMEOUT = 5
+    FINISHED = 6

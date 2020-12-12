@@ -155,7 +155,9 @@ class GW2API(object):
             self.__logger.exception('__api_get_response: failed to perform GET request for url %s' % url)
             return (0, None)
 
-        if resp.status == 404:
+        if resp.status == 400:
+            self.__logger.warning('__api_get_response: TIMEOUT for url %s' % url)
+        elif resp.status == 404:
             self.__logger.error('__api_get_response: NOT FOUND for url %s' % url)
         elif resp.status == 502:
             self.__logger.warning('__api_get_response: BAD GATEWAY for url %s' % url)
