@@ -50,18 +50,30 @@ class GW2API(object):
 
     def get_account_id(self) -> str:
         if self._account_info is None:
-            logging.error('GW2API/get_account_id: account info is None')
+            self.__logger.error('get_account_id: account info is None', exc_info=True)
             return None
 
         return self._account_info['id']
 
     def get_account_name(self) -> str:
+        if self._account_info is None:
+            self.__logger.error('get_account_name: account info is None', exc_info=True)
+            return None
+
         return self._account_info['name']
 
     def get_owned_games(self) -> List[str]:
+        if self._account_info is None:
+            self.__logger.error('get_owned_games: account info is None', exc_info=True)
+            return None
+
         return self._account_info['access']
 
     def get_account_age(self) -> int:
+        if self._account_info is None:
+            self.__logger.error('get_owned_games: account info is None', exc_info=True)
+            return None
+
         return self._account_info['age']
 
     async def get_account_achievements(self) -> Dict:
