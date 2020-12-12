@@ -37,6 +37,8 @@ class GW2API(object):
         self._api_key = None
         self._account_info = None
 
+        self.__achievements_chunk_size = 50
+
 
     async def shutdown(self):
         await self.__http.shutdown()
@@ -88,23 +90,26 @@ class GW2API(object):
                     ids_to_request.append(achievement['id'])
                     result[achievement['id']] = None
 
-            #chunk requests
+            #split requests in chunks
             def chunks(l, n):
                 for i in range(0, len(l), n):
                     yield l[i:i + n]
-            chunks = list(chunks(ids_to_request, 100))
+            chunks = list(chunks(ids_to_request, self.__achievements_chunk_size))
 
-            #get additional info
+            #request info for chunks
             for chunk in chunks:
                 (status, achievements_info) = await self.__api_get_achievements_info(self._api_key, chunk)
                 if status == 200 or status == 206:
                     for achievement in achievements_info:
                         result[achievement['id']] = achievement['name']
-                elif 'text' in achievements_info:
-                    if achievements_info['text'] == 'all ids provided are invalid':
-                        logging.warning('GW2API/get_account_achievement: all IDs are invalid')
                 else:
-                    logging.error('GW2API/get_account_achievements: failed to get achievements info, code %s' % status)
+                    if (achievements_info is not None) and ('text' in achievements_info):
+                        if achievements_info['text'] == 'all ids provided are invalid':
+                            self.__logger.warning('get_account_achievements: all IDs are invalid')
+                        else:
+                            self.__logger.error('get_account_achievements: (%s, %s)' % (status, achievements_info['text']))
+               
+                    self.__logger.error('get_account_achievements: failed to get achievements info, code %s' % status)
 
         return result
 
