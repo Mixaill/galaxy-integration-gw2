@@ -70,6 +70,8 @@ def get_game_instances_windows() -> List[GWLocalGame]:
 
                     if os.path.exists(os.path.join(game_dir,game_executable)):
                         result.append(GWLocalGame(game_dir.lower(),game_executable.lower()))
+                except ElementTree.ParseError:
+                    logging.getLogger('gw2_local_game').warn('get_game_instances_windows: failed to parse XML file %s' % file_name)
                 except PermissionError:
                     logging.getLogger('gw2_local_game').warn('get_game_instances_windows: permission error')
 
