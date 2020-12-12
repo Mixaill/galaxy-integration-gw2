@@ -27,8 +27,8 @@ class GW2API(object):
     LOCALSERVER_HOST = '127.0.0.1'
     LOCALSERVER_PORT = 13338
 
-    def __init__(self):
-        self.__http = common.mglx_http.MglxHttp(user_agent='gog_gw2/0.4.2', verify_ssl=False)
+    def __init__(self, plugin_version):
+        self.__http = common.mglx_http.MglxHttp(user_agent='gog_gw2/%s' % plugin_version, verify_ssl=False)
         self.__logger = logging.getLogger('gw2_api')
 
         self._server_thread = None

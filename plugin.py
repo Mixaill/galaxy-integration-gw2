@@ -95,7 +95,7 @@ class GuildWars2Plugin(Plugin):
 
         self.__logger = logging.getLogger('plugin')
 
-        self._gw2_api = gw2.gw2_api.GW2API()
+        self._gw2_api = gw2.gw2_api.GW2API(manifest['version'])
         self._game_instances = None
 
         self.__task_check_for_achievements = None
