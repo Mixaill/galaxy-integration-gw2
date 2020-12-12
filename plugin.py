@@ -38,10 +38,13 @@ import urllib3
 logging.getLogger("urllib3").propagate = False
 
 #start sentry
-import sentry_sdk
-sentry_sdk.init(
-    "https://801708b080aa4699beb708e5ac909cc9@sentry.friends-of-friends-of-galaxy.org/3",
-    release=("galaxy-integration-gw2@%s" % manifest['version']))
+try:
+    import sentry_sdk
+    sentry_sdk.init(
+        "https://801708b080aa4699beb708e5ac909cc9@sentry.friends-of-friends-of-galaxy.org/3",
+        release=("galaxy-integration-gw2@%s" % manifest['version']))
+except Exception:
+    logging.exception('plugin/bootstrap: failed to initialize sentry')
 
 from galaxy.api.consts import OSCompatibility, Platform, LicenseType, LocalGameState
 from galaxy.api.errors import BackendError, InvalidCredentials
