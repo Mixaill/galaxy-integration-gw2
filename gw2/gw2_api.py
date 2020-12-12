@@ -27,6 +27,8 @@ class GW2API(object):
     LOCALSERVER_HOST = '127.0.0.1'
     LOCALSERVER_PORT = 13338
 
+    RETRIES_COUNT = 5
+
     def __init__(self, plugin_version):
         self.__http = common.mglx_http.MglxHttp(user_agent='gog_gw2/%s' % plugin_version, verify_ssl=False)
         self.__logger = logging.getLogger('gw2_api')
@@ -75,9 +77,13 @@ class GW2API(object):
     async def get_account_achievements(self) -> List[int]:
         result = list()
 
-        (status, achievements_account) = await self.__api_get_account_achievements(self._api_key)
+        if not self._api_key:
+            self.__logger.error('get_account_achievements: api_key is None', exc_info=True)
+            return result
+
+        (status, achievements_account) = await self.__api_get_response(self._api_key, self.API_URL_ACCOUNT_ACHIVEMENTS)
         if status != 200:
-            self.__logger.warn('get_account_achievements: failed to get achivements %s' % status)
+            self.__logger.warn('get_account_achievements: failed to get achievements %s' % status)
             return result
 
         for achievement in achievements_account:
@@ -98,7 +104,7 @@ class GW2API(object):
             self.__logger.warn('do_auth_apikey: api_key is is None')
             return GW2AuthorizationResult.FAILED
 
-        (status_code, account_info) = await self.__api_get_account_info(api_key)
+        (status_code, account_info) = await self.__api_get_response(api_key, self.API_URL_ACCOUNT)
  
         if status_code != 200:
             if 'text' in account_info:
@@ -132,32 +138,37 @@ class GW2API(object):
     async def __api_get_response(self, api_key, url, parameters = None):
         result = None
 
+        #update authorization cookie
         self.__http.update_headers({'Authorization': 'Bearer ' + api_key})
 
-        resp = None
-        try:
-            resp = await self.__http.request_get(self.API_DOMAIN+url, params=parameters)
-        except Exception:
-            self.__logger.exception('__api_get_response: failed to perform GET request for url %s' % url)
-            return (0, None)
+        #make request
+        retries = self.RETRIES_COUNT
+        while retries > 0:
+            #decrement remaining retries counter
+            retries = retries - 1
 
-        if resp.status == 400:
-            self.__logger.warning('__api_get_response: TIMEOUT for url %s' % url)
-        elif resp.status == 404:
-            self.__logger.error('__api_get_response: NOT FOUND for url %s' % url)
-        elif resp.status == 502:
-            self.__logger.warning('__api_get_response: BAD GATEWAY for url %s' % url)
+            #send request
+            resp = None
+            try:
+                resp = await self.__http.request_get(self.API_DOMAIN+url, params=parameters)
+            except Exception:
+                self.__logger.exception('__api_get_response: failed to perform GET request for url %s' % url)
+                return (0, None)
 
-        try: 
-            result = json.loads(resp.text)
-        except Exception:
-            logging.error('__api_get_response: failed to parse response %s for url %s' % (resp.text, url))
-
+            #log response status
+            if resp.status == 400:
+                self.__logger.warning('__api_get_response: TIMEOUT for url %s' % url)
+            elif resp.status == 404:
+                self.__logger.error('__api_get_response: NOT FOUND for url %s' % url)
+            elif resp.status == 502:
+                self.__logger.warning('__api_get_response: BAD GATEWAY for url %s' % url)
+            elif resp.status == 504:
+                self.__logger.warning('__api_get_response: GATEWAY TIMEOUT for url %s' % url)
+            else:    
+                try: 
+                    result = json.loads(resp.text)
+                    break
+                except Exception:
+                    self.__logger.exception('__api_get_response: failed to parse response %s for url %s' % (resp.text, url))
 
         return (resp.status, result)
-
-    async def __api_get_account_info(self, api_key):
-        return await self.__api_get_response(api_key, self.API_URL_ACCOUNT)
-
-    async def __api_get_account_achievements(self, api_key):
-        return await self.__api_get_response(api_key, self.API_URL_ACCOUNT_ACHIVEMENTS)
