@@ -107,6 +107,13 @@ class GuildWars2Plugin(Plugin):
 
         self.__platform = get_platform()
 
+        self.__achievements_db = None
+        try:
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "gw2/db/achievements.json")) as f:
+                self.__achievements_db = json.load(f)
+        except Exception:
+            self.__logger.exception('__init__: failed to read achievements info DB')
+
     #
     # Authentication
     #
@@ -274,15 +281,36 @@ class GuildWars2Plugin(Plugin):
             self.__imported_achievements = list()
 
         self.__imported_achievements.clear()
-        for key, value in (await self._gw2_api.get_account_achievements()).items():
-            cache_key = 'achievement_%s' % key
+        for achievement_id in await self._gw2_api.get_account_achievements():
+            #check for existence    
+            if not self.__is_achievement_exists(achievement_id):
+                continue
+
+            #save unlock time
+            cache_key = 'achievement_%s' % achievement_id
             if cache_key not in self.persistent_cache:
                 self.persistent_cache[cache_key] = int(time.time())
 
-            result.append(Achievement(self.persistent_cache.get(cache_key), key, value))
+            #append to list
+            result.append(Achievement(self.persistent_cache.get(cache_key), achievement_id, self.__get_achievement_name(achievement_id)))
 
         self.push_cache()
         return result
+
+    def __is_achievement_exists(self, achievement_id: int) -> bool:
+        if not self.__achievements_db:
+            return False
+        
+        if str(achievement_id) not in self.__achievements_db:
+            return False
+
+        return True
+
+    def __get_achievement_name(self, achievement_id: int) -> str:
+        if not self.__is_achievement_exists(achievement_id):
+            return 'achievement_%s' % achievement_id
+
+        return self.__achievements_db[str(achievement_id)]
 
     #
     # ImportLocalSize
@@ -321,10 +349,21 @@ class GuildWars2Plugin(Plugin):
 
     async def task_check_for_achievements(self):
         if self.__imported_achievements:
-            for key, value in self._gw2_api.get_account_achievements().items():
-                if key not in self.__imported_achievements:
-                    self.__imported_achievements.append(key)
-                    self.unlock_achievement(self.GAME_ID, Achievement(0, key, value))
+            for achievement_id in self._gw2_api.get_account_achievements():
+                if achievement_id not in self.__imported_achievements:
+                    #check for existence
+                    if not self.__is_achievement_exists(achievement_id):
+                        continue
+
+                    #mark as processed
+                    self.__imported_achievements.append(achievement_id)
+                    
+                    #save unlock time
+                    cache_key = 'achievement_%s' % achievement_id
+                    self.persistent_cache[cache_key] = int(time.time())
+
+                    #push to galaxy
+                    self.unlock_achievement(self.GAME_ID, Achievement(self.persistent_cache.get(cache_key), achievement_id, self.__get_achievement_name(achievement_id)))
 
         await asyncio.sleep(self.SLEEP_CHECK_ACHIEVEMENTS)
 

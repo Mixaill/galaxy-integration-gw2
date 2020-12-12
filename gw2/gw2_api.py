@@ -31,14 +31,8 @@ class GW2API(object):
         self.__http = common.mglx_http.MglxHttp(user_agent='gog_gw2/%s' % plugin_version, verify_ssl=False)
         self.__logger = logging.getLogger('gw2_api')
 
-        self._server_thread = None
-        self._server_object = None
-
         self._api_key = None
         self._account_info = None
-
-        self.__achievements_chunk_size = 50
-
 
     async def shutdown(self):
         await self.__http.shutdown()
@@ -78,41 +72,19 @@ class GW2API(object):
 
         return self._account_info['age']
 
-    async def get_account_achievements(self) -> Dict:
-        result = dict()
+    async def get_account_achievements(self) -> List[int]:
+        result = list()
 
         (status, achievements_account) = await self.__api_get_account_achievements(self._api_key)
-        if status == 200:
-            #select completed achievements
-            ids_to_request = list()
-            for achievement in achievements_account:
-                if achievement['done'] == True:
-                    ids_to_request.append(achievement['id'])
-                    result[achievement['id']] = None
+        if status != 200:
+            self.__logger.warn('get_account_achievements: failed to get achivements %s' % status)
+            return result
 
-            #split requests in chunks
-            def chunks(l, n):
-                for i in range(0, len(l), n):
-                    yield l[i:i + n]
-            chunks = list(chunks(ids_to_request, self.__achievements_chunk_size))
-
-            #request info for chunks
-            for chunk in chunks:
-                (status, achievements_info) = await self.__api_get_achievements_info(self._api_key, chunk)
-                if status == 200 or status == 206:
-                    for achievement in achievements_info:
-                        result[achievement['id']] = achievement['name']
-                else:
-                    if (achievements_info is not None) and ('text' in achievements_info):
-                        if achievements_info['text'] == 'all ids provided are invalid':
-                            self.__logger.warning('get_account_achievements: all IDs are invalid')
-                        else:
-                            self.__logger.error('get_account_achievements: (%s, %s)' % (status, achievements_info['text']))
-               
-                    self.__logger.error('get_account_achievements: failed to get achievements info, code %s' % status)
+        for achievement in achievements_account:
+            if achievement['done'] == True:
+                result.append(achievement['id'])
 
         return result
-
 
     #
     # Authorization server
@@ -184,14 +156,8 @@ class GW2API(object):
 
         return (resp.status, result)
 
-
     async def __api_get_account_info(self, api_key):
         return await self.__api_get_response(api_key, self.API_URL_ACCOUNT)
 
-
     async def __api_get_account_achievements(self, api_key):
         return await self.__api_get_response(api_key, self.API_URL_ACCOUNT_ACHIVEMENTS)
-
-
-    async def __api_get_achievements_info(self, api_key, ids : List[int]):
-        return await self.__api_get_response(api_key, self.API_URL_ACHIEVEMENTS, 'ids=' + ','.join(str(i) for i in ids))
