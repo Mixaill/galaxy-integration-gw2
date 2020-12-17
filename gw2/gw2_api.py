@@ -110,23 +110,21 @@ class GW2API(object):
         (status_code, account_info) = await self.__api_get_response(api_key, self.API_URL_ACCOUNT)
  
         if status_code != 200:
-            if 'text' in account_info:
+            if (account_info is not None) and ('text' in account_info):
                 if account_info['text'] == 'Invalid access token':
                     return GW2AuthorizationResult.FAILED_INVALID_TOKEN
-
-                if account_info['text'] == 'invalid key':
+                elif account_info['text'] == 'invalid key':
                     return GW2AuthorizationResult.FAILED_INVALID_KEY
-
-                if account_info['text'] == 'no game account':
+                elif account_info['text'] == 'no game account':
                     return GW2AuthorizationResult.FAILED_NO_ACCOUNT
-
-                if account_info['text'] == 'ErrBadData':
+                elif account_info['text'] == 'ErrBadData':
                     return GW2AuthorizationResult.FAILED_BAD_DATA
-
-                if account_info['text'] == 'ErrTimeout':
+                elif account_info['text'] == 'ErrTimeout':
                     return GW2AuthorizationResult.FAILED_TIMEOUT
+                else:
+                    self.__logger.error('do_auth_apikey: unknown error description %s, %s' % (status_code, account_info))
 
-            self.__logger.error('do_auth_apikey: %s, %s' % (status_code, account_info))
+            self.__logger.warn('do_auth_apikey: %s, %s' % (status_code, account_info))
             return GW2AuthorizationResult.FAILED
 
         if account_info is None:
@@ -167,11 +165,12 @@ class GW2API(object):
                 self.__logger.warning('__api_get_response: BAD GATEWAY for url %s' % url)
             elif resp.status == 504:
                 self.__logger.warning('__api_get_response: GATEWAY TIMEOUT for url %s' % url)
-            else:    
+            elif (resp.status == 200) and (resp.text is not None):   
                 try: 
                     result = json.loads(resp.text)
-                    break
                 except Exception:
-                    self.__logger.exception('__api_get_response: failed to parse response %s for url %s' % (resp.text, url))
+                    self.__logger.exception('__api_get_response: failed to parse response, url=%s, status=%s, text=%s' % (url, resp.status, resp.text))
+            else:
+                self.__logger.error('__api_get_response: unknown error, url=%s, status=%s, text=%s' % (url, resp.status, resp.text))
 
         return (resp.status, result)
