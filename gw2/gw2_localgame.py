@@ -25,6 +25,9 @@ class GWLocalGame(object):
                     fp = os.path.join(dirpath, f)
                     if not os.path.islink(fp):
                         total_size += os.path.getsize(fp)
+        except asyncio.CancelledError:
+            self.__logger.warn('get_app_size: cancelled')
+            return total_size
         except Exception:
             self.__logger.exception('get_app_size:')
 
