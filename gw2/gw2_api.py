@@ -69,8 +69,11 @@ class GW2API(object):
 
     def get_account_age(self) -> int:
         if self._account_info is None:
-            self.__logger.error('get_owned_games: account info is None', exc_info=True)
+            self.__logger.error('get_account_age: account info is None', exc_info=True)
             return None
+
+        if 'age' not in self._account_info:
+            return 0
 
         return self._account_info['age']
 
