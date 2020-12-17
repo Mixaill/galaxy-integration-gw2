@@ -30,7 +30,7 @@ if thirdparty not in sys.path and os.path.exists(thirdparty):
 
 #read manifest
 menifest = None
-with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest.json")) as manifest:
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest.json"), mode="r", encoding="utf-8") as manifest:
     manifest = json.load(manifest)
 
 #disable urllib3 logging
@@ -109,7 +109,7 @@ class GuildWars2Plugin(Plugin):
 
         self.__achievements_db = None
         try:
-            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "gw2/db/achievements.json")) as f:
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "gw2/db/achievements.json"), mode="r", encoding="utf-8") as f:
                 self.__achievements_db = json.load(f)
         except Exception:
             self.__logger.exception('__init__: failed to read achievements info DB')
