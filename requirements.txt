@@ -1,5 +1,6 @@
-aiohttp == 3.7.4
-certifi == 2022.12.7
-galaxy.plugin.api == 0.67.0
-typing-extensions == 3.7.4.3
+aiohttp == 3.14.1
+certifi == 2026.5.20
+galaxy.plugin.api == 0.71
+typing-extensions == 4.15.0
 sentry_sdk == 0.19.5
+legacy-cgi==2.6.4
