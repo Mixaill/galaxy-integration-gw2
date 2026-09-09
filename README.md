@@ -1,14 +1,18 @@
 # galaxy-integration-gw2
 
-GOG Galaxy 2.0 Guild Wars 2 integration
+GOG Galaxy 2.1 Guild Wars 2 integration (64-bit, Python 3.13)
+
+Forked and adapted for GOG Galaxy 2.1 from:
+
+* https://github.com/Mixaill/galaxy-integration-gw2/releases
 
 ## Installation
 
-* Unpack latest archive from https://github.com/Mixaill/galaxy-integration-gw2/releases to `%localappdata%\GOG.com\Galaxy\plugins\installed\gw2\`
+* Unpack latest archive from https://github.com/valentinistrate/galaxy-integration-gw2-1/releases to `%localappdata%\GOG.com\Galaxy\plugins\installed\gw2\`
 
 ## Changelog
 
-* https://github.com/Mixaill/galaxy-integration-gw2/releases
+* https://github.com/valentinistrate/galaxy-integration-gw2-1/releases
 
 ## Crashreporting
 

@@ -19,9 +19,9 @@ class MglxHttp:
 
         if verify_ssl:
             self.__sslcontext = ssl.create_default_context(cafile=certifi.where())
-            self.__connector = aiohttp.TCPConnector(ssl_context=self.__sslcontext)
+            self.__connector = aiohttp.TCPConnector(ssl=self.__sslcontext)
         else:
-            self.__connector = aiohttp.TCPConnector(verify_ssl=False)
+            self.__connector = aiohttp.TCPConnector(ssl=False)
 
         self.__session_headers = {'User-Agent': self.__user_agent}
         self.__session = aiohttp.ClientSession(connector=self.__connector, headers = self.__session_headers)

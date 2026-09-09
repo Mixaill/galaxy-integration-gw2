@@ -23,8 +23,17 @@ def get_platform() -> str:
     logging.error('plugin/get_platform: unknown platform %s' % system)
     return 'unknown'
 
+#thirdparty deps dir helper (macOS ships separate arm64/x86_64 dep folders, see download_deps)
+def get_thirdparty_dirname() -> str:
+    plat = get_platform()
+    if plat == 'macos':
+        arch = 'arm64' if platform.machine().lower() == 'arm64' else 'x86_64'
+        return '3rdparty_macos_%s' % arch
+
+    return '3rdparty_%s' % plat
+
 #expand sys.path
-thirdparty =  os.path.join(os.path.dirname(os.path.realpath(__file__)),'3rdparty_%s/' % get_platform())
+thirdparty =  os.path.join(os.path.dirname(os.path.realpath(__file__)), get_thirdparty_dirname() + '/')
 if thirdparty not in sys.path and os.path.exists(thirdparty):
     sys.path.insert(0, thirdparty)
 
