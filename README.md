@@ -36,7 +36,7 @@ Alternatively push a tag `v<version>` matching `manifest.json`.
 
 ## Achievement names
 
-`gw2/db/achievements.json` contains the names of all achievements known when it was generated. Names of newer achievements are requested from the API at runtime. To update the file run `python tools/update_achievements_db.py`. The `Update achievements DB` GitHub workflow does this monthly (or manually via "Run workflow") and opens a pull request if the file changed.
+`gw2/db/achievements.json` contains the names of all achievements known when it was generated. Names of newer achievements are requested from the API at runtime. To update the file run `python tools/update_achievements_db.py`. The `Update achievements DB` GitHub workflow does this monthly (or manually via "Run workflow") and opens a pull request if the file changed. The pull request also increases the patch version in `manifest.json` (if the current version was already released) and adds a changelog entry, so a release can be created right after merging it.
 
 ## Logs
 

@@ -23,15 +23,36 @@ jobs:
       - name: Regenerate gw2/db/achievements.json
         run: python tools/update_achievements_db.py
 
+      - name: Increase patch version and update changelog
+        # Only if the DB changed. The version is increased only if the current version was already released
+        # (tag exists), otherwise the entry is added to the changelog of the not yet released version.
+        run: |
+          if git diff --quiet -- gw2/db/achievements.json; then
+            echo "achievements DB unchanged"
+            exit 0
+          fi
+          VERSION=$(python -c "import json; print(json.load(open('manifest.json'))['version'])")
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
+            python tools/add_changelog_entry.py --bump-patch "Updated achievements DB"
+          else
+            python tools/add_changelog_entry.py "Updated achievements DB"
+          fi
+
       - name: Create pull request
         uses: peter-evans/create-pull-request@v7
         with:
           branch: automation/update-achievements-db
           delete-branch: true
-          add-paths: gw2/db/achievements.json
+          add-paths: |
+            gw2/db/achievements.json
+            manifest.json
+            README.md
           commit-message: Update achievements DB
           title: Update achievements DB
           body: |
             Regenerated `gw2/db/achievements.json` from the Guild Wars 2 API with `tools/update_achievements_db.py`.
+
+            If the current version was already released, the patch version in `manifest.json` is increased. The changelog in `README.md` gets an "Updated achievements DB" entry.
+            After merging, start the `Release` workflow to publish the new version.
 
             Created by the `Update achievements DB` workflow.
