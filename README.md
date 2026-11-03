@@ -29,7 +29,7 @@ GOG Galaxy 2.1+ runs plugins with a bundled 64-bit Python 3.13, so the third-par
 
 The `Release` GitHub workflow builds the plugin archive (including the `3rdparty_windows` dependencies) and publishes it as a GitHub release:
 
-1. Increase `version` in `manifest.json` and add a `### <version>` section to the changelog below, merge to `master`.
+1. Increase `version` in `manifest.json` and add a `### <version>` section to the changelog below, merge to `main`.
 2. On GitHub open Actions -> "Release" -> "Run workflow". This creates the tag `v<version>` and the release with the archive and the changelog section as description.
 
 Alternatively push a tag `v<version>` matching `manifest.json`.
