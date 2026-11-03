@@ -25,6 +25,15 @@ GOG Galaxy 2.1+ runs plugins with a bundled 64-bit Python 3.13, so the third-par
 1. Run `download_deps.cmd` (Windows) or `download_deps.sh` (Linux/macOS). This fills `3rdparty_windows/` with the packages from `requirements.txt`.
 2. Copy the repository content (without `.git`) to `%localappdata%\GOG.com\Galaxy\plugins\installed\gw2\`.
 
+## Creating a release
+
+The `Release` GitHub workflow builds the plugin archive (including the `3rdparty_windows` dependencies) and publishes it as a GitHub release:
+
+1. Increase `version` in `manifest.json` and add a `### <version>` section to the changelog below, merge to `master`.
+2. On GitHub open Actions -> "Release" -> "Run workflow". This creates the tag `v<version>` and the release with the archive and the changelog section as description.
+
+Alternatively push a tag `v<version>` matching `manifest.json`.
+
 ## Achievement names
 
 `gw2/db/achievements.json` contains the names of all achievements known when it was generated. Names of newer achievements are requested from the API at runtime. To update the file run `python tools/update_achievements_db.py`. The `Update achievements DB` GitHub workflow does this monthly (or manually via "Run workflow") and opens a pull request if the file changed.

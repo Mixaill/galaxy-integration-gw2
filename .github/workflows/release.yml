@@ -1,0 +1,80 @@
+name: Release
+
+# Builds the plugin archive (code + 3rdparty_windows dependencies) and publishes it as a GitHub release.
+#
+# Two ways to start it:
+#   * Actions tab -> "Release" -> "Run workflow": uses the version from manifest.json and creates the tag v<version>
+#   * pushing a tag like v0.6.1 (must match the version in manifest.json)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Determine version
+        id: version
+        run: |
+          VERSION=$(python -c "import json; print(json.load(open('manifest.json'))['version'])")
+          TAG="v$VERSION"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "$TAG" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match version $VERSION in manifest.json (expected $TAG)"
+            exit 1
+          fi
+          if [ "${GITHUB_REF_TYPE}" != "tag" ] && git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null; then
+            echo "::error::Tag $TAG already exists. Increase the version in manifest.json first."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Download dependencies for Windows 64-bit / Python 3.13
+        run: |
+          python -m pip install -r ./requirements.txt --platform win_amd64 --python-version 3.13 \
+            --implementation cp --only-binary=:all: --target ./3rdparty_windows --no-compile --upgrade
+
+      - name: Build archive
+        run: |
+          ZIP="galaxy-integration-gw2-${{ steps.version.outputs.version }}.zip"
+          find . -name '__pycache__' -type d -prune -exec rm -rf {} +
+          zip -r -9 "$ZIP" plugin.py manifest.json LICENSE README.md common gw2 3rdparty_windows
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+
+      - name: Extract release notes from README changelog
+        run: |
+          awk -v v="${{ steps.version.outputs.version }}" '
+            $0 == "### " v { found = 1; next }
+            found && /^(### |## |Older versions:)/ { exit }
+            found { print }
+          ' README.md > release_notes.md
+          cat >> release_notes.md <<'NOTES'
+
+          ## Installation
+
+          1. Close GOG Galaxy.
+          2. Unpack the archive to `%localappdata%\GOG.com\Galaxy\plugins\installed\gw2\` (replace an existing older version completely).
+          3. Start GOG Galaxy and connect the Guild Wars 2 integration with your API key.
+          NOTES
+          cat release_notes.md
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ steps.version.outputs.tag }}
+          body_path: release_notes.md
+          files: ${{ env.ZIP }}
