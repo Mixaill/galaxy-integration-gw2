@@ -76,6 +76,8 @@ def main():
     parser.add_argument('--bump-patch', action='store_true', help='increase the patch version in manifest.json first')
     parser.add_argument('entry', help='changelog entry text')
     args = parser.parse_args()
+    if not args.entry.strip():
+        parser.error('the changelog entry must not be empty')
 
     if args.bump_patch:
         version = bump_patch()

@@ -6,9 +6,13 @@ Regenerates gw2/db/achievements.json (achievement id -> name) from the Guild War
 The plugin requests names of achievements missing in this file from the API at runtime,
 an up to date file only reduces the number of these requests.
 
-Usage: python tools/update_achievements_db.py
+Prints how many achievements were added, changed (renamed) and removed compared to the previous file.
+With --summary-file this summary is also written to the given file (used for the changelog entry).
+
+Usage: python tools/update_achievements_db.py [--summary-file PATH]
 """
 
+import argparse
 import json
 import os
 import time
@@ -30,7 +34,27 @@ def get_json(url):
     raise RuntimeError('failed to request %s' % url)
 
 
+def load_db():
+    if not os.path.exists(DB_PATH):
+        return dict()
+    with open(DB_PATH, mode='r', encoding='utf-8') as f:
+        return json.load(f)
+
+
+def get_summary(old, new):
+    added = len(new.keys() - old.keys())
+    removed = len(old.keys() - new.keys())
+    changed = sum(1 for k in new.keys() & old.keys() if new[k] != old[k])
+    return 'Updated achievements DB: %s added, %s changed, %s removed' % (added, changed, removed)
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--summary-file', help='write the summary of the changes to this file')
+    args = parser.parse_args()
+
+    old = load_db()
+
     ids = get_json(API_URL)
     print('found %s achievements' % len(ids))
 
@@ -44,11 +68,18 @@ def main():
     if len(names) < len(ids) * 0.9:
         raise RuntimeError('received only %s names for %s achievements' % (len(names), len(ids)))
 
+    new = {str(k): names[k] for k in sorted(names)}
     with open(DB_PATH, mode='w', encoding='utf-8', newline='\n') as f:
-        json.dump({str(k): names[k] for k in sorted(names)}, f, ensure_ascii=False, indent=4)
+        json.dump(new, f, ensure_ascii=False, indent=4)
         f.write('\n')
 
     print('written %s achievements to %s' % (len(names), os.path.normpath(DB_PATH)))
+
+    summary = get_summary(old, new)
+    print(summary)
+    if args.summary_file:
+        with open(args.summary_file, mode='w', encoding='utf-8') as f:
+            f.write(summary + '\n')
 
 
 if __name__ == '__main__':

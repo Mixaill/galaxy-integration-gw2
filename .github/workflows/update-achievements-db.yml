@@ -21,9 +21,10 @@ jobs:
           python-version: '3.13'
 
       - name: Regenerate gw2/db/achievements.json
-        run: python tools/update_achievements_db.py
+        run: python tools/update_achievements_db.py --summary-file "$RUNNER_TEMP/summary.txt"
 
       - name: Increase patch version and update changelog
+        id: changelog
         # Only if the DB changed. The version is increased only if the current version was already released
         # (tag exists), otherwise the entry is added to the changelog of the not yet released version.
         run: |
@@ -31,11 +32,13 @@ jobs:
             echo "achievements DB unchanged"
             exit 0
           fi
+          SUMMARY=$(cat "$RUNNER_TEMP/summary.txt")
+          echo "summary=$SUMMARY" >> "$GITHUB_OUTPUT"
           VERSION=$(python -c "import json; print(json.load(open('manifest.json'))['version'])")
           if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
-            python tools/add_changelog_entry.py --bump-patch "Updated achievements DB"
+            python tools/add_changelog_entry.py --bump-patch "$SUMMARY"
           else
-            python tools/add_changelog_entry.py "Updated achievements DB"
+            python tools/add_changelog_entry.py "$SUMMARY"
           fi
 
       - name: Create pull request
@@ -52,7 +55,9 @@ jobs:
           body: |
             Regenerated `gw2/db/achievements.json` from the Guild Wars 2 API with `tools/update_achievements_db.py`.
 
-            If the current version was already released, the patch version in `manifest.json` is increased. The changelog in `README.md` gets an "Updated achievements DB" entry.
+            ${{ steps.changelog.outputs.summary }}
+
+            If the current version was already released, the patch version in `manifest.json` is increased. The changelog in `README.md` gets an entry with the number of added, changed and removed achievements.
             After merging, start the `Release` workflow to publish the new version.
 
             Created by the `Update achievements DB` workflow.
